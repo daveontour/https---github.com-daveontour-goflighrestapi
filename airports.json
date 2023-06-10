@@ -1,0 +1,13 @@
+{
+    "airports":[
+        {
+            "airport":"AUH",
+            "token":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
+            "url":"http://localhost/SITAAMSIntegrationService/v2/SITAAMSIntegrationService",
+            "windowminimum": -10,
+            "windowmaximum": 15,
+            "listenerqueue": ".\\private$\\tow_tracker",
+            "chunksize":4
+        } 
+    ]
+}
