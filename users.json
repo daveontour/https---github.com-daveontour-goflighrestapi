@@ -1,0 +1,30 @@
+{
+    "users":[
+        {
+            "username":"Default User",
+            "key":"default",
+            "allowedairports":["AUH"],
+            "allowedairlines":["WY","QF","*"],
+            "allowedcustomfields":["Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax"],
+            "defaultairport":"AUH",
+            "defaultairline": "QF",
+            "overrideairline": "QF",
+            "queryablecustomfields": ["Il--_DisembarkingFirstPad","Sh--_GroundHandler"],
+            "defaultqueryablecustomfields": [
+                {"Parameter": "Il--_DisembarkingFirstPad","Value":"1"},
+                {"Parameter":"Sh--_GroundHandler","Value":"GroundHandler"}
+            ],
+            "overridequeryablecustomfields": [
+                {"Parameter": "Il--_DisembarkingFirstPad","Value":"0"}
+            ]
+        },
+        {
+            "username":"AUH",
+            "key":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
+            "allowedairports":["AUH"],
+            "allowedairlines": [],
+            "allowedcustomfields": [],
+            "queryablecustomfields": []
+        } 
+    ]
+}

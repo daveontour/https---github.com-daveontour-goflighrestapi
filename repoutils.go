@@ -70,6 +70,7 @@ func initRepository(repo Repository) {
 		chunkSize = 2
 	}
 
+	repoMutex.Lock()
 	for min := repo.WindowMin; min <= repo.WindowMax; min += chunkSize {
 		var envel Envelope
 		xml.Unmarshal(getFlights(repo, min, min+chunkSize), &envel)
@@ -95,6 +96,7 @@ func initRepository(repo Repository) {
 
 	repoMap[repo.Airport] = entry
 
+	repoMutex.Unlock()
 	go maintainRepository(repo)
 
 }
@@ -171,6 +173,9 @@ func updateRepository(repo Repository) {
 	var envel Envelope
 	xml.Unmarshal(getFlights(repo), &envel)
 
+	repoMutex.Lock()
+	defer repoMutex.Unlock()
+
 	if entry, ok := repoMap[repo.Airport]; ok {
 		for _, flight := range envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight {
 			entry.Flights[flight.GetFlightID()] = flight
@@ -209,9 +214,11 @@ func updateFlightEntry(message string, repo Repository) {
 
 	flightID := flight.GetFlightID()
 
+	repoMutex.Lock()
 	if airportentry, ok := repoMap[repo.Airport]; ok {
 		airportentry.Flights[flightID] = flight
 	}
+	repoMutex.Unlock()
 
 	flightUpdatedChannel <- envel.Content.FlightUpdatedNotification.Flight
 
@@ -232,6 +239,9 @@ func createFlightEntry(message string, repo Repository) {
 		log.Println("Create for Flight After Window")
 		return
 	}
+	repoMutex.Lock()
+	repoMap[repo.Airport].Flights[flight.GetFlightID()] = flight
+	repoMutex.Unlock()
 
 	flightCreatedChannel <- envel.Content.FlightCreatedNotification.Flight
 }
@@ -242,9 +252,12 @@ func deleteFlightEntry(message string, repo Repository) {
 	flight := envel.Content.FlightDeletedNotification.Flight
 	flightID := flight.GetFlightID()
 
+	repoMutex.Lock()
 	if airportentry, ok := repoMap[repo.Airport]; ok {
 		delete(airportentry.Flights, flightID)
 	}
+	repoMutex.Unlock()
+
 	flightDeletedChannel <- envel.Content.FlightDeletedNotification.Flight
 }
 

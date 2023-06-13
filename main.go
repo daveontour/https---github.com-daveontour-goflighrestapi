@@ -10,6 +10,8 @@ import (
 var repoMap = make(map[string]Repository)
 var wg sync.WaitGroup
 
+var repoMutex sync.Mutex
+
 var repositoryUpdateChannel = make(chan int)
 var flightUpdatedChannel = make(chan Flight)
 var flightCreatedChannel = make(chan Flight)
@@ -40,13 +42,6 @@ func cup() {
 			fmt.Print("Repository Channel Update", c)
 		case flight := <-flightUpdatedChannel:
 			fmt.Println("FlightUpdated:", flight.GetFlightID())
-			// b, err := json.MarshalIndent(flight, "", "  ")
-			// if err != nil {
-			// 	fmt.Println(err)
-			// } else {
-			// 	fmt.Println(string(b))
-			// }
-			testDupAndPrune(flight)
 		case flight := <-flightDeletedChannel:
 			fmt.Println("FlightDeleted:", flight.GetFlightID())
 		case flight := <-flightCreatedChannel:
