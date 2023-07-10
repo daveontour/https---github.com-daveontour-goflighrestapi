@@ -1,0 +1,6 @@
+{
+    "servicename": "aagetflightservice",
+    "servicedisplayname": "AAA GetFlight Rest API",
+    "servicedescription": "A  HTTP/JSON  Rest Service for retrieving flights from AMS",
+    "serviceipport":"127.0.0.1:8081"
+}

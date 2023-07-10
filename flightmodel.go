@@ -225,13 +225,6 @@ type TableValue struct {
 	Value        []Value `xml:"Value"`
 }
 
-type StandSlot struct {
-	Value []Value `xml:"Value" json:"Slot,omitempty"`
-}
-type StandSlots struct {
-	StandSlot []StandSlot `xml:"StandSlot" json:"StandSlot,omitempty"`
-}
-
 func (ss StandSlots) MarshalJSON() ([]byte, error) {
 
 	var sb strings.Builder
@@ -249,6 +242,15 @@ func (ss StandSlots) MarshalJSON() ([]byte, error) {
 			}
 			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
 		}
+		for _, v := range s.Stand.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
+		}
+
+		for _, v := range s.Stand.Area.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"Area%s\":\"%s\"", v.PropertyName, v.Text))
+		}
 		sb.WriteString("}")
 
 	}
@@ -257,13 +259,6 @@ func (ss StandSlots) MarshalJSON() ([]byte, error) {
 
 	return []byte(sb.String()), nil
 
-}
-
-type CarouselSlot struct {
-	Value []Value `xml:"Value" json:"Slot,omitempty"`
-}
-type CarouselSlots struct {
-	CarouselSlot []CarouselSlot `xml:"CarouselSlot" json:"CarouselSlot,omitempty"`
 }
 
 func (ss CarouselSlots) MarshalJSON() ([]byte, error) {
@@ -283,6 +278,15 @@ func (ss CarouselSlots) MarshalJSON() ([]byte, error) {
 			}
 			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
 		}
+		for _, v := range s.Carousel.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
+		}
+
+		for _, v := range s.Carousel.Area.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"Area%s\":\"%s\"", v.PropertyName, v.Text))
+		}
 		sb.WriteString("}")
 
 	}
@@ -291,13 +295,6 @@ func (ss CarouselSlots) MarshalJSON() ([]byte, error) {
 
 	return []byte(sb.String()), nil
 
-}
-
-type GatelSlot struct {
-	Value []Value `xml:"Value"`
-}
-type GateSlots struct {
-	GateSlot []GatelSlot `xml:"GateSlot" json:"GateSlot,omitempty"`
 }
 
 func (ss GateSlots) MarshalJSON() ([]byte, error) {
@@ -317,21 +314,25 @@ func (ss GateSlots) MarshalJSON() ([]byte, error) {
 			}
 			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
 		}
+		for _, v := range s.Gate.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
+		}
+
+		for _, v := range s.Gate.Area.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"Area%s\":\"%s\"", v.PropertyName, v.Text))
+		}
+
 		sb.WriteString("}")
 
 	}
 
 	sb.WriteString("]")
+	fmt.Println(sb.String())
 
 	return []byte(sb.String()), nil
 
-}
-
-type CheckInSlot struct {
-	Value []Value `xml:"Value"`
-}
-type CheckInSlots struct {
-	CheckInSlot []CheckInSlot `xml:"CheckInSlot" json:"CheckInSlot,omitempty"`
 }
 
 func (ss CheckInSlots) MarshalJSON() ([]byte, error) {
@@ -351,21 +352,21 @@ func (ss CheckInSlots) MarshalJSON() ([]byte, error) {
 			}
 			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
 		}
+		for _, v := range s.CheckIn.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
+		}
+		for _, v := range s.CheckIn.Area.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"Area%s\":\"%s\"", v.PropertyName, v.Text))
+		}
 		sb.WriteString("}")
-
 	}
 
 	sb.WriteString("]")
 
 	return []byte(sb.String()), nil
 
-}
-
-type ChuteSlot struct {
-	Value []Value `xml:"Values"`
-}
-type ChuteSlots struct {
-	ChuteSlot []ChuteSlot `xml:"ChuteSlot" json:"ChuteSlot,omitempty"`
 }
 
 func (ss ChuteSlots) MarshalJSON() ([]byte, error) {
@@ -385,6 +386,14 @@ func (ss ChuteSlots) MarshalJSON() ([]byte, error) {
 			}
 			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
 		}
+		for _, v := range s.Chute.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"%s\":\"%s\"", v.PropertyName, v.Text))
+		}
+		for _, v := range s.Chute.Area.Value {
+			sb.WriteString(",")
+			sb.WriteString(fmt.Sprintf("\"Area%s\":\"%s\"", v.PropertyName, v.Text))
+		}
 		sb.WriteString("}")
 
 	}
@@ -395,11 +404,19 @@ func (ss ChuteSlots) MarshalJSON() ([]byte, error) {
 
 }
 
+type AircraftId struct {
+	Registration string `xml:"Registration" json:"Registration" `
+}
+type Aircraft struct {
+	AircraftId AircraftId `xml:"AircraftId" json:"AircraftId"`
+}
+
 type FlightState struct {
 	XMLName       xml.Name      `xml:"FlightState" json:"-"`
 	ScheduledTime string        `xml:"ScheduledTime" `
 	LinkedFlight  LinkedFlight  `xml:"LinkedFlight"`
 	AircraftType  AircraftType  `xml:"AircraftType"`
+	Aircraft      Aircraft      `xml:"Aircraft" json:"Aircraft"`
 	Route         Route         `xml:"Route" json:"-"`
 	Value         []Value       `xml:"Value" json:"Values,omitempty"`
 	TableValue    []TableValue  `xml:"TableValue" json:"TableValues,omitempty"`
@@ -446,6 +463,9 @@ func (d FlightState) MarshalJSON() ([]byte, error) {
 	ac, _ := json.Marshal(d.AircraftType)
 	sb.WriteString(fmt.Sprintf("\"AircraftType\":%s,", string(ac)))
 
+	ac2, _ := json.Marshal(d.Aircraft)
+	sb.WriteString(fmt.Sprintf("\"Aircraft\":%s,", string(ac2)))
+
 	rt, _ := json.Marshal(d.Route)
 	sb.WriteString(fmt.Sprintf("\"Route\":%s,", string(rt)))
 
@@ -490,6 +510,7 @@ type Flight struct {
 	FlightId      FlightId      `xml:"FlightId" json:"FlightId"`
 	FlightState   FlightState   `xml:"FlightState" json:"FlightState"`
 	FlightChanges FlightChanges `xml:"FlightChanges" json:"FlightChanges"`
+	LastUpdate    time.Time     `xml:"LastUpdate" json:"LastUpdate"`
 	//Properties    map[string]string `xml:"-" json:"-"`
 }
 type Flights struct {
@@ -630,13 +651,69 @@ func (f Flight) GetFlightID() string {
 	airline := f.GetIATAAirline()
 	fltNum := f.FlightId.FlightNumber
 	sto := f.FlightState.ScheduledTime
-	kind := "D"
+	// kind := "D"
+	// if f.IsArrival() {
+	// 	kind = "A"
+	// }
+	return airline + fltNum + "@" + sto
+}
+func (f Flight) GetFlightDirection() string {
+
 	if f.IsArrival() {
-		kind = "A"
+		return "Arrival"
+	} else {
+		return "Departure"
 	}
-	return airline + fltNum + kind + "@" + sto
+
 }
 
+func (f Flight) GetFlightRoute() string {
+
+	var sb strings.Builder
+	idx := 0
+
+	for _, rp := range f.FlightState.Route.ViaPoints.RouteViaPoint {
+		for _, ap := range rp.AirportCode {
+			if idx > 0 {
+				sb.WriteString(",")
+			}
+
+			if ap.CodeContext == "IATA" {
+				sb.WriteString(ap.Text)
+				idx++
+			}
+
+		}
+	}
+
+	return sb.String()
+
+}
+
+func (f Flight) GetAircraftType() string {
+
+	sb := "-"
+
+	for _, rp := range f.FlightState.AircraftType.AircraftTypeId.AircraftTypeCode {
+
+		if rp.CodeContext == "IATA" {
+			sb = rp.Text
+		}
+	}
+
+	return sb
+
+}
+
+func (f Flight) GetAircraftRegistration() string {
+
+	if f.FlightState.Aircraft.AircraftId.Registration != "" {
+		return f.FlightState.Aircraft.AircraftId.Registration
+	} else {
+		return "-"
+	}
+
+}
 func (f Flight) GetSTO() time.Time {
 
 	sto := f.FlightState.ScheduledTime

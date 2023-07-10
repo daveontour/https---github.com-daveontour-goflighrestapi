@@ -9,7 +9,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -34,7 +36,14 @@ const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soa
 </soapenv:Envelope>`
 
 func InitRepositories() {
-	fileContent, err := os.Open("airports.json")
+
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	fileContent, err := os.Open(filepath.Join(exPath, "airports.json"))
 
 	if err != nil {
 		log.Fatal(err)
@@ -51,17 +60,74 @@ func InitRepositories() {
 
 	for _, v := range repos.Repositories {
 		v.Flights = make(map[string]Flight)
+		v.CarouselAllocationMap = make(map[string]ResourceAllocationMap)
+		v.CheckInAllocationMap = make(map[string]ResourceAllocationMap)
+		v.StandAllocationMap = make(map[string]ResourceAllocationMap)
+		v.GateAllocationMap = make(map[string]ResourceAllocationMap)
+		v.ChuteAllocationMap = make(map[string]ResourceAllocationMap)
 		repoMap[v.Airport] = v
 	}
 
 	repositoryUpdateChannel <- 1
 
-	for _, v := range repos.Repositories {
-		initRepository(v)
+	for _, v := range repoMap {
+		initRepository(&v)
 	}
 }
 
-func initRepository(repo Repository) {
+func addResourcesToMap(resources []FixedResource, mapp map[string]ResourceAllocationMap) map[string]ResourceAllocationMap {
+
+	for _, c := range resources {
+		r := ResourceAllocationMap{
+			Resource:             c,
+			FlightAllocationsMap: make(map[string]AllocationItem),
+		}
+
+		mapp[c.Name] = r
+	}
+	return mapp
+}
+
+func populateResourceMaps(repo *Repository, resourceWG *sync.WaitGroup) {
+
+	var checkInAllocationMap = make(map[string]ResourceAllocationMap)
+	var standAllocationMap = make(map[string]ResourceAllocationMap)
+	var gateAllocationMap = make(map[string]ResourceAllocationMap)
+	var carouselAllocationMap = make(map[string]ResourceAllocationMap)
+	var chuteAllocationMap = make(map[string]ResourceAllocationMap)
+
+	// Retrieve the available resources
+	var checkIns FixedResources
+	xml.Unmarshal(getResource(*repo, "CheckIns"), &checkIns)
+	checkInAllocationMap = addResourcesToMap(checkIns.Values, checkInAllocationMap)
+
+	var stands FixedResources
+	xml.Unmarshal(getResource(*repo, "Stands"), &stands)
+	standAllocationMap = addResourcesToMap(stands.Values, standAllocationMap)
+
+	var gates FixedResources
+	xml.Unmarshal(getResource(*repo, "Gates"), &gates)
+	gateAllocationMap = addResourcesToMap(gates.Values, gateAllocationMap)
+
+	var carousels FixedResources
+	xml.Unmarshal(getResource(*repo, "Carousels"), &carousels)
+	carouselAllocationMap = addResourcesToMap(carousels.Values, carouselAllocationMap)
+
+	var chutes FixedResources
+	xml.Unmarshal(getResource(*repo, "Chutes"), &chutes)
+	chuteAllocationMap = addResourcesToMap(chutes.Values, chuteAllocationMap)
+
+	repo.CheckInAllocationMap = checkInAllocationMap
+	repo.StandAllocationMap = standAllocationMap
+	repo.CarouselAllocationMap = carouselAllocationMap
+	repo.GateAllocationMap = gateAllocationMap
+	repo.ChuteAllocationMap = chuteAllocationMap
+
+	repoMap[repo.Airport] = *repo
+
+	resourceWG.Done()
+}
+func initRepository(repo *Repository) {
 
 	// Break up the window into smaller chunks to avoid timeouts or single big hit
 	//
@@ -70,18 +136,28 @@ func initRepository(repo Repository) {
 		chunkSize = 2
 	}
 
+	var resourceWG sync.WaitGroup
+	resourceWG.Add(1)
+	go populateResourceMaps(repo, &resourceWG)
+
+	// Retrieve the current flights
 	repoMutex.Lock()
 	for min := repo.WindowMin; min <= repo.WindowMax; min += chunkSize {
 		var envel Envelope
-		xml.Unmarshal(getFlights(repo, min, min+chunkSize), &envel)
+		xml.Unmarshal(getFlights(*repo, min, min+chunkSize), &envel)
 
-		if entry, ok := repoMap[repo.Airport]; ok {
-			for _, flight := range envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight {
-				entry.Flights[flight.GetFlightID()] = flight
-			}
-			repoMap[repo.Airport] = entry
+		//Wait until the Resource have all been gotten
+		resourceWG.Wait()
 
+		//		if entry, ok := repoMap[repo.Airport]; ok {
+		for _, flight := range envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight {
+			flight.LastUpdate = time.Now()
+			repo.Flights[flight.GetFlightID()] = flight
+			repo.FlightList.insert(flight)
+			upadateAllocation(flight, repo)
 		}
+		//			repoMap[repo.Airport] = entry
+		//		}
 	}
 
 	fmt.Println("Repository loaded for ", repo.Airport, "  Number of flights = ", len(repoMap[repo.Airport].Flights))
@@ -97,7 +173,8 @@ func initRepository(repo Repository) {
 	repoMap[repo.Airport] = entry
 
 	repoMutex.Unlock()
-	go maintainRepository(repo)
+
+	go maintainRepository(*repo)
 
 }
 
@@ -178,6 +255,7 @@ func updateRepository(repo Repository) {
 
 	if entry, ok := repoMap[repo.Airport]; ok {
 		for _, flight := range envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight {
+			flight.LastUpdate = time.Now()
 			entry.Flights[flight.GetFlightID()] = flight
 		}
 
@@ -200,6 +278,7 @@ func updateFlightEntry(message string, repo Repository) {
 	xml.Unmarshal([]byte(message), &envel)
 
 	flight := envel.Content.FlightUpdatedNotification.Flight
+	flight.LastUpdate = time.Now()
 
 	sdot := flight.GetSDO()
 
@@ -220,6 +299,8 @@ func updateFlightEntry(message string, repo Repository) {
 	}
 	repoMutex.Unlock()
 
+	upadateAllocation(flight, &repo)
+
 	flightUpdatedChannel <- envel.Content.FlightUpdatedNotification.Flight
 
 }
@@ -228,6 +309,7 @@ func createFlightEntry(message string, repo Repository) {
 	xml.Unmarshal([]byte(message), &envel)
 
 	flight := envel.Content.FlightCreatedNotification.Flight
+	flight.LastUpdate = time.Now()
 
 	sdot := flight.GetSDO()
 
@@ -243,6 +325,7 @@ func createFlightEntry(message string, repo Repository) {
 	repoMap[repo.Airport].Flights[flight.GetFlightID()] = flight
 	repoMutex.Unlock()
 
+	upadateAllocation(flight, &repo)
 	flightCreatedChannel <- envel.Content.FlightCreatedNotification.Flight
 }
 func deleteFlightEntry(message string, repo Repository) {
@@ -258,6 +341,7 @@ func deleteFlightEntry(message string, repo Repository) {
 	}
 	repoMutex.Unlock()
 
+	deleteAllocation(flight, &repo)
 	flightDeletedChannel <- envel.Content.FlightDeletedNotification.Flight
 }
 
@@ -293,6 +377,33 @@ func getFlights(repo Repository, values ...int) []byte {
 
 	req.Header.Set("Content-Type", "text/xml;charset=UTF-8")
 	req.Header.Add("SOAPAction", "http://www.sita.aero/ams6-xml-api-webservice/IAMSIntegrationService/GetFlights")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		fmt.Printf("client: error making http request: %s\n", err)
+		os.Exit(1)
+	}
+
+	resBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		fmt.Printf("client: could not read response body: %s\n", err)
+		os.Exit(1)
+	}
+
+	return resBody
+}
+
+func getResource(repo Repository, resourceType string) []byte {
+
+	url := repo.RestURL + "/" + repo.Airport + "/" + resourceType
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		fmt.Printf("client: could not create request: %s\n", err)
+		os.Exit(1)
+	}
+
+	req.Header.Set("Authorization", repo.Token)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

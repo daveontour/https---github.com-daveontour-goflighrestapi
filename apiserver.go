@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -15,22 +16,386 @@ import (
 
 func startGinServer() {
 
-	router := gin.Default()
+	gin.SetMode(gin.ReleaseMode)
+	router := gin.New()
 
 	router.GET("/getFlights/:apt", getRequestedFlights)
-	router.GET("/getFlights/", getRequestedFlights)
-	router.Run()
+	router.GET("/getCheckin/:apt/:checkIn", getCheckIn)
+
+	router.GET("/getResource/:apt/:resourceType/:resource", getResources)
+	router.GET("/getResources/:apt/:resourceType", getResources)
+	router.GET("/getResources/:apt", getResources)
+
+	router.GET("/getFlightResources/:apt/:flight", getResources)
+	router.GET("/getAirlineResources/:apt/:airline", getResources)
+
+	router.GET("/getConfiguredResources/:apt/:resourceType", getConfiguredResources)
+	router.GET("/getConfiguredResources/:apt", getConfiguredResources)
+
+	router.Run(serviceConfig.ServiceIPPort)
 
 }
 
+func getConfiguredResources(c *gin.Context) {
+	apt := c.Param("apt")
+	resourceType := c.Param("resourceType")
+
+	// Create the response object so we can return early if required
+	response := ResourceResponse{}
+	c.Writer.Header().Set("Content-Type", "application/json")
+
+	if resourceType != "" {
+		response.ResourceType = resourceType
+	} else {
+		response.ResourceType = "All Resources"
+	}
+
+	if resourceType != "" && !strings.Contains("Checkin Gate Stand Carousel Chute", resourceType) {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid resouce type specified. "})
+		return
+	}
+
+	var err error
+
+	// Get the profile of the user making the request
+	userProfile := getUserProfile(c)
+	response.User = userProfile.UserName
+
+	// Set Default airport if none set
+	if apt == "" && userProfile.DefaultAirport != "" {
+		apt = userProfile.DefaultAirport
+	}
+
+	//Check that the user is allowed to access the requested airport
+	if !contains(userProfile.AllowedAirlines, apt) &&
+		!contains(userProfile.AllowedAirlines, "*") {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "User is not permitted to access airport %s"})
+		return
+	}
+
+	// Check that the requested airport exists in the repository
+	_, ok := repoMap[apt]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Airport %s not found", apt)})
+		return
+	}
+
+	response.AirportCode = apt
+
+	var alloc = []ConfiguredResourceResponseItem{}
+
+	allocMaps := []map[string]ResourceAllocationMap{
+		repoMap[apt].CheckInAllocationMap,
+		repoMap[apt].GateAllocationMap,
+		repoMap[apt].StandAllocationMap,
+		repoMap[apt].ChuteAllocationMap,
+		repoMap[apt].CarouselAllocationMap}
+
+	for idx, allocMap := range allocMaps {
+
+		//If a resource type has been specified, ignore the rest
+		if resourceType != "" {
+			if resourceType == "Checkin" && idx != 0 {
+				continue
+			}
+			if resourceType == "Gate" && idx != 1 {
+				continue
+			}
+			if resourceType == "Stand" && idx != 2 {
+				continue
+			}
+			if resourceType == "Chute" && idx != 3 {
+				continue
+			}
+			if resourceType == "Carousel" && idx != 4 {
+				continue
+			}
+		}
+
+		for _, r := range allocMap {
+
+			mapp := allocMap[r.Resource.Name]
+
+			n := ConfiguredResourceResponseItem{
+				ResourceTypeCode: mapp.Resource.ResourceTypeCode,
+				Name:             mapp.Resource.Name,
+				Area:             mapp.Resource.Area,
+			}
+			alloc = append(alloc, n)
+
+		}
+	}
+
+	response.ConfiguredResources = alloc
+
+	// Get the filtered and pruned flights for the request
+	//response, err = filterFlights(request, response, repoMap[apt].Flights, c)
+
+	if err == nil {
+		c.JSON(http.StatusOK, response)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", err.Error())})
+	}
+}
+
+func getResources(c *gin.Context) {
+
+	flightID := c.Param("flight")
+	apt := c.Param("apt")
+	airline := c.Param("airline")
+	resourceType := c.Param("resourceType")
+	resource := c.Param("resource")
+	from := c.Query("from")
+	to := c.Query("to")
+	updatedSince := c.Query("updatedSince")
+	loc, _ := time.LoadLocation("Local")
+
+	// Create the response object so we can return early if required
+	response := ResourceResponse{}
+	c.Writer.Header().Set("Content-Type", "application/json")
+
+	if resourceType != "" && !strings.Contains("Checkin Gate Stand Carousel Chute", resourceType) {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid resouce type specified. "})
+		return
+	}
+
+	fromTime, fromErr := time.ParseInLocation("2006-01-02T15:04:05", from, loc)
+	if fromErr != nil && from != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid 'from' time specified. "})
+		return
+	}
+
+	toTime, toErr := time.ParseInLocation("2006-01-02T15:04:05", to, loc)
+	if toErr != nil && to != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid 'to' time specified. "})
+		return
+	}
+
+	updatedSinceTime, updatedSinceErr := time.ParseInLocation("2006-01-02T15:04:05", updatedSince, loc)
+	if updatedSinceErr != nil && updatedSince != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid 'updatedSince' time specified. "})
+		return
+	}
+	var err error
+
+	// Get the profile of the user making the request
+	userProfile := getUserProfile(c)
+	response.User = userProfile.UserName
+
+	// Set Default airport if none set
+	if apt == "" && userProfile.DefaultAirport != "" {
+		apt = userProfile.DefaultAirport
+	}
+
+	//Check that the user is allowed to access the requested airport
+	if !contains(userProfile.AllowedAirlines, apt) &&
+		!contains(userProfile.AllowedAirlines, "*") {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "User is not permitted to access airport %s"})
+		return
+	}
+
+	// Check that the requested airport exists in the repository
+	_, ok := repoMap[apt]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Airport %s not found", apt)})
+		return
+	}
+
+	response.AirportCode = apt
+
+	var alloc = []AllocationResponseItem{}
+
+	allocMaps := []map[string]ResourceAllocationMap{
+		repoMap[apt].CheckInAllocationMap,
+		repoMap[apt].GateAllocationMap,
+		repoMap[apt].StandAllocationMap,
+		repoMap[apt].ChuteAllocationMap,
+		repoMap[apt].CarouselAllocationMap}
+
+	for idx, allocMap := range allocMaps {
+
+		//If a resource type has been specified, ignore the rest
+		if resourceType != "" {
+			if resourceType == "Checkin" && idx != 0 {
+				continue
+			}
+			if resourceType == "Gate" && idx != 1 {
+				continue
+			}
+			if resourceType == "Stand" && idx != 2 {
+				continue
+			}
+			if resourceType == "Chute" && idx != 3 {
+				continue
+			}
+			if resourceType == "Carousel" && idx != 4 {
+				continue
+			}
+		}
+
+		for _, r := range allocMap {
+
+			//If a specific resource has been requested, ignore the rest
+			if resource != "" && r.Resource.Name != resource {
+				continue
+			}
+
+			mapp := allocMap[r.Resource.Name]
+			for _, v := range allocMap[r.Resource.Name].FlightAllocationsMap {
+
+				test := false
+
+				if airline != "" && strings.HasPrefix(v.FlightID, airline) {
+					test = true
+				}
+				if flightID != "" && strings.Contains(v.FlightID, flightID) {
+					test = true
+				}
+
+				if airline == "" && flightID == "" {
+					test = true
+				}
+
+				if test {
+
+					// Window of interest processing
+					if fromErr == nil {
+						if v.To.Before(fromTime) {
+							continue
+						}
+					}
+
+					if toErr == nil {
+						if v.From.After(toTime) {
+							continue
+						}
+					}
+
+					if updatedSinceErr == nil {
+						if v.LastUpdate.Before(updatedSinceTime) {
+							continue
+						}
+					}
+
+					n := AllocationResponseItem{
+						AllocationItem: AllocationItem{From: v.From,
+							To:                   v.To,
+							FlightID:             v.FlightID,
+							Direction:            v.Direction,
+							Route:                v.Route,
+							AircraftType:         v.AircraftType,
+							AircraftRegistration: v.AircraftRegistration,
+							LastUpdate:           v.LastUpdate},
+						ResourceType: mapp.Resource.ResourceTypeCode,
+						Name:         mapp.Resource.Name,
+						Area:         mapp.Resource.Area,
+					}
+					alloc = append(alloc, n)
+				}
+			}
+		}
+	}
+
+	sort.Slice(alloc, func(i, j int) bool {
+		return alloc[i].From.Before(alloc[j].From)
+	})
+
+	response.Allocations = alloc
+
+	// Get the filtered and pruned flights for the request
+	//response, err = filterFlights(request, response, repoMap[apt].Flights, c)
+
+	if err == nil {
+		c.JSON(http.StatusOK, response)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", err.Error())})
+	}
+
+}
+
+func getCheckIn(c *gin.Context) {
+
+	checkIn := c.Param("checkIn")
+	apt := c.Param("apt")
+
+	// Create the response object so we can return early if required
+	response := ResourceResponse{}
+	c.Writer.Header().Set("Content-Type", "application/json")
+
+	var err error
+
+	// Get the profile of the user making the request
+	userProfile := getUserProfile(c)
+	response.User = userProfile.UserName
+
+	// Set Default airport if none set
+	if apt == "" && userProfile.DefaultAirport != "" {
+		apt = userProfile.DefaultAirport
+	}
+
+	//Check that the user is allowed to access the requested airport
+	if !contains(userProfile.AllowedAirlines, apt) &&
+		!contains(userProfile.AllowedAirlines, "*") {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "User is not permitted to access airport %s"})
+		return
+	}
+
+	// Check that the requested airport exists in the repository
+	_, ok := repoMap[apt]
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Airport %s not found", apt)})
+		return
+	}
+
+	response.AirportCode = apt
+
+	var alloc = []AllocationResponseItem{}
+
+	mapp := repoMap[apt].CheckInAllocationMap[checkIn]
+	for _, v := range repoMap[apt].CheckInAllocationMap[checkIn].FlightAllocationsMap {
+		n := AllocationResponseItem{
+			AllocationItem: AllocationItem{From: v.From, To: v.To, FlightID: v.FlightID, LastUpdate: v.LastUpdate}, ResourceType: mapp.Resource.ResourceTypeCode, Name: mapp.Resource.Name, Area: mapp.Resource.Area,
+		}
+
+		alloc = append(alloc, n)
+	}
+
+	sort.Slice(alloc, func(i, j int) bool {
+		return alloc[i].From.Before(alloc[j].From)
+	})
+
+	response.Allocations = alloc
+
+	// Get the filtered and pruned flights for the request
+	//response, err = filterFlights(request, response, repoMap[apt].Flights, c)
+
+	if err == nil {
+		c.JSON(http.StatusOK, response)
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", err.Error())})
+	}
+
+}
+
+func getRequestedFlights2(c *gin.Context) {
+	c.Writer.Header().Set("Content-Type", "application/json")
+	c.JSON(http.StatusOK, gin.H{"Message": "All OK"})
+}
 func getUserProfile(c *gin.Context) UserProfile {
 
 	//Read read the file for each request so changes can be made without the need to restart the server
 
-	fileContent, err := os.Open("users.json")
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	fileContent, err := os.Open(filepath.Join(exPath, "users.json"))
 
 	if err != nil {
-		log.Fatal(err)
+		elog.Error(99, "Error Reading "+filepath.Join(exPath, "users.json"))
+		elog.Error(99, err.Error())
 		return UserProfile{}
 	}
 
@@ -115,7 +480,7 @@ func getRequestedFlights(c *gin.Context) {
 		return
 	}
 
-	// Check that the requested airport exists inthe repository
+	// Check that the requested airport exists in the repository
 	_, ok := repoMap[apt]
 	if !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Airport %s not found", apt)})
@@ -169,6 +534,7 @@ func normaliseRequest(request Request, response Response, c *gin.Context) (Reque
 		queryMap := c.Request.URL.Query()
 
 		// Go through the querable parameters
+
 		for _, queryableParameter := range request.UserProfile.QueryableCustomFields {
 
 			value, present := queryMap[queryableParameter]
@@ -206,24 +572,20 @@ func normaliseRequest(request Request, response Response, c *gin.Context) (Reque
 		}
 	}
 
-	// if request.PresentQueryableParameters != nil &&
-	// 	request.UserProfile.OverrideQueryableCustomFields != nil {
-	// 	request.PresentQueryableParameters = request.UserProfile.OverrideQueryableCustomFields
-	// 	response.AddWarning("Custom Field query overridden by Administrator Configuration")
-	// }
-
 	return request, response
 }
 func filterFlights(request Request, response Response, flights map[string]Flight, c *gin.Context) (Response, error) {
 
 	returnFlights := []Flight{}
+	loc, _ := time.LoadLocation("Local")
 
 	var from time.Time
 	var to time.Time
+	var updatedSinceTime time.Time
 
 	// Set up the time bounds if required. Return error to user if not well formed date
 	if request.From != "" {
-		f, err := time.Parse("2006-01-02T15:04:05", request.From)
+		f, err := time.ParseInLocation("2006-01-02T15:04:05", request.From, loc)
 		if err != nil {
 			return Response{}, err
 		} else {
@@ -232,11 +594,20 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 		}
 	}
 	if (request.To) != "" {
-		t, err := time.Parse("2006-01-02T15:04:05", request.To)
+		t, err := time.ParseInLocation("2006-01-02T15:04:05", request.To, loc)
 		if err != nil {
 			return Response{}, err
 		} else {
 			to = t
+			response.To = t.String()
+		}
+	}
+	if request.UpdatedSince != "" {
+		t, err := time.ParseInLocation("2006-01-02T15:04:05", request.UpdatedSince, loc)
+		if err != nil {
+			return Response{}, err
+		} else {
+			updatedSinceTime = t
 			response.To = t.String()
 		}
 	}
@@ -284,6 +655,11 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 		}
 		if request.To != "" {
 			if f.GetSTO().After(to) {
+				continue
+			}
+		}
+		if request.UpdatedSince != "" {
+			if f.LastUpdate.Before(updatedSinceTime) {
 				continue
 			}
 		}
@@ -357,4 +733,13 @@ func prune(flight Flight, request Request) Flight {
 	flDup.FlightChanges.Changes = changes
 
 	return flDup
+}
+
+func contains(elems []string, v string) bool {
+	for _, s := range elems {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }

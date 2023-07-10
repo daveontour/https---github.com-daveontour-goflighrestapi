@@ -7,16 +7,7 @@
             "allowedairlines":["WY","QF","*"],
             "allowedcustomfields":["Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax"],
             "defaultairport":"AUH",
-            "defaultairline": "QF",
-            "overrideairline": "QF",
-            "queryablecustomfields": ["Il--_DisembarkingFirstPad","Sh--_GroundHandler"],
-            "defaultqueryablecustomfields": [
-                {"Parameter": "Il--_DisembarkingFirstPad","Value":"1"},
-                {"Parameter":"Sh--_GroundHandler","Value":"GroundHandler"}
-            ],
-            "overridequeryablecustomfields": [
-                {"Parameter": "Il--_DisembarkingFirstPad","Value":"0"}
-            ]
+            "queryablecustomfields": ["Il--_DisembarkingFirstPad","Sh--_GroundHandler"]
         },
         {
             "username":"AUH",
@@ -24,7 +15,18 @@
             "allowedairports":["AUH"],
             "allowedairlines": [],
             "allowedcustomfields": [],
-            "queryablecustomfields": []
+            "queryablecustomfields": [],
+            "defaultqueryablecustomfields": [
+                {"Parameter": "Il--_DisembarkingFirstPad","Value":"1"},
+                {"Parameter":"Sh--_GroundHandler","Value":"GroundHandler"}
+            ],
+            "overridequeryablecustomfields": [
+                {"Parameter": "Il--_DisembarkingFirstPad","Value":"1"}
+            ],
+            "defaultairline": "QF",
+            "overrideairline": "QF"                      
+
+
         } 
     ]
 }
