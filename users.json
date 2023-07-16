@@ -5,7 +5,7 @@
             "key":"default",
             "allowedairports":["AUH"],
             "allowedairlines":["WY","QF","*"],
-            "allowedcustomfields":["Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax"],
+            "allowedcustomfields":["FlightUniqueID","Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax","S---_Terminal"],
             "defaultairport":"AUH",
             "queryablecustomfields": ["Il--_DisembarkingFirstPad","Sh--_GroundHandler"]
         },

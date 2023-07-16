@@ -24,6 +24,7 @@ type AllocationItem struct {
 	Route                string
 	AircraftType         string
 	AircraftRegistration string
+	AirportCode          string
 	LastUpdate           time.Time
 }
 
@@ -84,20 +85,6 @@ type ConfiguredResourceResponseItem struct {
 	Area             string `xml:"Area"`
 }
 
-type FlightLinkItem struct {
-	Next       *FlightLinkItem
-	Previous   *FlightLinkItem
-	sto        time.Time
-	lastUpdate time.Time
-	FlightID   string
-	Flight     Flight
-}
-
-type FlightList struct {
-	head *FlightLinkItem
-	tail *FlightLinkItem
-}
-
 type ResourceAllocationMap struct {
 	Resource             FixedResource
 	FlightAllocationsMap map[string]AllocationItem
@@ -108,10 +95,13 @@ type ParameterValuePair struct {
 }
 
 type ServiceConfig struct {
-	ServiceName        string `json:"servicename"`
-	ServicDisplayName  string `json:"servicedisplayname"`
-	ServiceDescription string `json:"servicedescription"`
-	ServiceIPPort      string `json:"serviceipport"`
+	ServiceName                      string `json:"servicename"`
+	ServicDisplayName                string `json:"servicedisplayname"`
+	ServiceDescription               string `json:"servicedescription"`
+	ServiceIPPort                    string `json:"serviceipport"`
+	ScheduleUpdateJob                string `json:"scheduleUpdateJob"`
+	ScheduleUpdateJobIntervalInHours int    `json:"scheduleUpdateJobIntervalInHours"`
+	DebugService                     bool   `json:"debugService"`
 }
 
 type UserProfile struct {
@@ -144,7 +134,6 @@ type Repository struct {
 	ListenerQueue         string `json:"listenerqueue"`
 	ChunkSize             int    `json:"chunksize"`
 	Flights               map[string]Flight
-	FlightList            FlightList
 	CurrentLowerLimit     time.Time
 	CurrentUpperLimit     time.Time
 	CheckInAllocationMap  map[string]ResourceAllocationMap
@@ -152,6 +141,13 @@ type Repository struct {
 	GateAllocationMap     map[string]ResourceAllocationMap
 	CarouselAllocationMap map[string]ResourceAllocationMap
 	ChuteAllocationMap    map[string]ResourceAllocationMap
+}
+
+func (r *Repository) updateLowerLimit(t time.Time) {
+	r.CurrentLowerLimit = t
+}
+func (r *Repository) updateUpperLimit(t time.Time) {
+	r.CurrentUpperLimit = t
 }
 
 type Repositories struct {
@@ -408,152 +404,63 @@ type ChuteSlots struct {
 	ChuteSlot []ChuteSlot `xml:"ChuteSlot" json:"ChuteSlot,omitempty"`
 }
 
-func (list *FlightList) insert(flight Flight) {
+// func (list *FlightList) insert(flight Flight) {
 
-	newNode := &FlightLinkItem{
-		Flight:   flight,
-		FlightID: flight.GetFlightID(),
-		Previous: nil,
-		Next:     nil,
-	}
+// 	newNode := &FlightLinkItem{
+// 		Flight:   flight,
+// 		FlightID: flight.GetFlightID(),
+// 		Previous: nil,
+// 		Next:     nil,
+// 	}
 
-	startdata := flight.GetSTO()
+// 	startdata := flight.GetSTO()
 
-	if list.head == nil {
-		list.head = newNode
-		list.tail = newNode
-	} else if startdata.Before(list.head.Flight.GetSTO()) || startdata == list.head.Flight.GetSTO() {
-		newNode.Next = list.head
-		list.head.Previous = newNode
-		list.head = newNode
-	} else if startdata.After(list.tail.Flight.GetSTO()) {
-		newNode.Previous = list.tail
-		list.tail.Next = newNode
-		list.tail = newNode
-	} else {
-		currentNode := list.head.Next
-		for currentNode != nil {
-			if startdata.Before(currentNode.Flight.GetSTO()) || startdata == currentNode.Flight.GetSTO() {
-				newNode.Previous = currentNode.Previous
-				newNode.Next = currentNode
-				currentNode.Previous.Next = newNode
-				currentNode.Previous = newNode
-				break
-			}
-			currentNode = currentNode.Next
-		}
-	}
-}
+// 	if list.head == nil {
+// 		list.head = newNode
+// 		list.tail = newNode
+// 	} else if startdata.Before(list.head.Flight.GetSTO()) || startdata == list.head.Flight.GetSTO() {
+// 		newNode.Next = list.head
+// 		list.head.Previous = newNode
+// 		list.head = newNode
+// 	} else if startdata.After(list.tail.Flight.GetSTO()) {
+// 		newNode.Previous = list.tail
+// 		list.tail.Next = newNode
+// 		list.tail = newNode
+// 	} else {
+// 		currentNode := list.head.Next
+// 		for currentNode != nil {
+// 			if startdata.Before(currentNode.Flight.GetSTO()) || startdata == currentNode.Flight.GetSTO() {
+// 				newNode.Previous = currentNode.Previous
+// 				newNode.Next = currentNode
+// 				currentNode.Previous.Next = newNode
+// 				currentNode.Previous = newNode
+// 				break
+// 			}
+// 			currentNode = currentNode.Next
+// 		}
+// 	}
+// }
 
-func (list *FlightList) remove(flightId string) {
-	currentNode := list.head
-	for currentNode != nil {
-		if currentNode.FlightID == flightId {
-			if currentNode == list.head {
-				list.head = currentNode.Next
-				if list.head != nil {
-					list.head.Previous = nil
-				} else {
-					list.tail = nil
-				}
-			} else if currentNode == list.tail {
-				list.tail = currentNode.Previous
-				list.tail.Next = nil
-			} else {
-				currentNode.Previous.Next = currentNode.Next
-				currentNode.Next.Previous = currentNode.Previous
-			}
-			break
-		}
-		currentNode = currentNode.Next
-	}
-}
-
-func upadateAllocation(flight Flight, repo *Repository) {
-
-	// It's too messy to do CRUD operations, so just delete all the allocations and then create them again from the current message
-
-	deleteAllocation(flight, repo)
-
-	flightId := flight.GetFlightID()
-
-	for _, checkInSlot := range flight.FlightState.CheckInSlots.CheckInSlot {
-		checkInID, start, end := checkInSlot.getResourceID()
-
-		_, ok := repo.CheckInAllocationMap[checkInID]
-		if ok {
-			repo.CheckInAllocationMap[checkInID].FlightAllocationsMap[flightId] = getAllocationItem(start, end, flight)
-		}
-	}
-
-	for _, gateSlot := range flight.FlightState.GateSlots.GateSlot {
-		gateID, start, end := gateSlot.getResourceID()
-		_, ok := repo.GateAllocationMap[gateID]
-		if ok {
-			repo.GateAllocationMap[gateID].FlightAllocationsMap[flightId] = getAllocationItem(start, end, flight)
-		}
-	}
-
-	for _, standSlot := range flight.FlightState.StandSlots.StandSlot {
-		standID, start, end := standSlot.getResourceID()
-		_, ok := repo.StandAllocationMap[standID]
-		if ok {
-			repo.StandAllocationMap[standID].FlightAllocationsMap[flightId] = getAllocationItem(start, end, flight)
-		}
-	}
-
-	for _, carouselSlot := range flight.FlightState.CarouselSlots.CarouselSlot {
-		carouselID, start, end := carouselSlot.getResourceID()
-		_, ok := repo.CarouselAllocationMap[carouselID]
-		if ok {
-			repo.CarouselAllocationMap[carouselID].FlightAllocationsMap[flightId] = getAllocationItem(start, end, flight)
-		}
-	}
-
-	for _, chuteSlot := range flight.FlightState.ChuteSlots.ChuteSlot {
-		chuteID, start, end := chuteSlot.getResourceID()
-		_, ok := repo.ChuteAllocationMap[chuteID]
-		if ok {
-			repo.ChuteAllocationMap[chuteID].FlightAllocationsMap[flightId] = getAllocationItem(start, end, flight)
-		}
-	}
-}
-
-func getAllocationItem(start, end time.Time, flight Flight) AllocationItem {
-
-	flightId := flight.GetFlightID()
-	flightDirection := flight.GetFlightDirection()
-
-	allocationItem := AllocationItem{
-		From:                 start,
-		To:                   end,
-		FlightID:             flightId,
-		Direction:            flightDirection,
-		Route:                flight.GetFlightRoute(),
-		AircraftType:         flight.GetAircraftType(),
-		AircraftRegistration: flight.GetAircraftRegistration(),
-		LastUpdate:           time.Now().Local()}
-	return allocationItem
-
-}
-
-func deleteAllocation(flight Flight, repo *Repository) {
-
-	flightId := flight.GetFlightID()
-
-	for _, v := range repo.CheckInAllocationMap {
-		delete(v.FlightAllocationsMap, flightId)
-	}
-	for _, v := range repo.GateAllocationMap {
-		delete(v.FlightAllocationsMap, flightId)
-	}
-	for _, v := range repo.StandAllocationMap {
-		delete(v.FlightAllocationsMap, flightId)
-	}
-	for _, v := range repo.CarouselAllocationMap {
-		delete(v.FlightAllocationsMap, flightId)
-	}
-	for _, v := range repo.ChuteAllocationMap {
-		delete(v.FlightAllocationsMap, flightId)
-	}
-}
+// func (list *FlightList) remove(flightId string) {
+// 	currentNode := list.head
+// 	for currentNode != nil {
+// 		if currentNode.FlightID == flightId {
+// 			if currentNode == list.head {
+// 				list.head = currentNode.Next
+// 				if list.head != nil {
+// 					list.head.Previous = nil
+// 				} else {
+// 					list.tail = nil
+// 				}
+// 			} else if currentNode == list.tail {
+// 				list.tail = currentNode.Previous
+// 				list.tail.Next = nil
+// 			} else {
+// 				currentNode.Previous.Next = currentNode.Next
+// 				currentNode.Next.Previous = currentNode.Previous
+// 			}
+// 			break
+// 		}
+// 		currentNode = currentNode.Next
+// 	}
+// }

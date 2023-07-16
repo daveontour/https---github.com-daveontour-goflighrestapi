@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -65,127 +64,101 @@ func InitRepositories() {
 		v.StandAllocationMap = make(map[string]ResourceAllocationMap)
 		v.GateAllocationMap = make(map[string]ResourceAllocationMap)
 		v.ChuteAllocationMap = make(map[string]ResourceAllocationMap)
-		repoMap[v.Airport] = v
+		repoList = append(repoList, v)
 	}
 
-	repositoryUpdateChannel <- 1
+	//repositoryUpdateChannel <- 1
 
-	for _, v := range repoMap {
-		initRepository(&v)
+	for _, v := range repoList {
+		initRepository(v.Airport)
 	}
 }
 
 func addResourcesToMap(resources []FixedResource, mapp map[string]ResourceAllocationMap) map[string]ResourceAllocationMap {
 
+	mapMutex.Lock()
 	for _, c := range resources {
 		r := ResourceAllocationMap{
 			Resource:             c,
 			FlightAllocationsMap: make(map[string]AllocationItem),
 		}
 
-		mapp[c.Name] = r
+		if _, ok := mapp[c.Name]; !ok {
+			mapp[c.Name] = r
+		}
+
 	}
+	mapMutex.Unlock()
+
 	return mapp
 }
 
-func populateResourceMaps(repo *Repository, resourceWG *sync.WaitGroup) {
+func initRepository(airportCode string) {
 
-	var checkInAllocationMap = make(map[string]ResourceAllocationMap)
-	var standAllocationMap = make(map[string]ResourceAllocationMap)
-	var gateAllocationMap = make(map[string]ResourceAllocationMap)
-	var carouselAllocationMap = make(map[string]ResourceAllocationMap)
-	var chuteAllocationMap = make(map[string]ResourceAllocationMap)
+	// Purge the listening queue first before doing the Initializarion of the repository
+	opts := []msmq.QueueInfoOption{
+		msmq.WithPathName(GetRepo(airportCode).ListenerQueue),
+	}
+	queueInfo, err := msmq.NewQueueInfo(opts...)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	queue, err := queueInfo.Open(msmq.Receive, msmq.DenyNone)
+
+	if err == nil {
+		purgeErr := queue.Purge()
+		if purgeErr != nil {
+			if isDebug {
+				elog.Error(1, "Error purging listening queue")
+			}
+		} else {
+			if isDebug {
+				elog.Info(1, "Listening queue purged OK")
+			}
+		}
+	}
+
+	populateResourceMaps(airportCode)
+
+	// The Maintence job schedules a repository population which inits the system
+	go maintainRepository(airportCode)
+}
+
+func populateResourceMaps(airportCode string) {
+
+	elog.Info(1, "Populating Resource Maps")
 	// Retrieve the available resources
+
+	elog.Info(1, "Populating Checkin Map")
 	var checkIns FixedResources
-	xml.Unmarshal(getResource(*repo, "CheckIns"), &checkIns)
-	checkInAllocationMap = addResourcesToMap(checkIns.Values, checkInAllocationMap)
+	xml.Unmarshal(getResource(airportCode, "CheckIns"), &checkIns)
+	addResourcesToMap(checkIns.Values, GetRepo(airportCode).CheckInAllocationMap)
 
 	var stands FixedResources
-	xml.Unmarshal(getResource(*repo, "Stands"), &stands)
-	standAllocationMap = addResourcesToMap(stands.Values, standAllocationMap)
+	xml.Unmarshal(getResource(airportCode, "Stands"), &stands)
+	addResourcesToMap(stands.Values, GetRepo(airportCode).StandAllocationMap)
 
 	var gates FixedResources
-	xml.Unmarshal(getResource(*repo, "Gates"), &gates)
-	gateAllocationMap = addResourcesToMap(gates.Values, gateAllocationMap)
+	xml.Unmarshal(getResource(airportCode, "Gates"), &gates)
+	addResourcesToMap(gates.Values, GetRepo(airportCode).GateAllocationMap)
 
 	var carousels FixedResources
-	xml.Unmarshal(getResource(*repo, "Carousels"), &carousels)
-	carouselAllocationMap = addResourcesToMap(carousels.Values, carouselAllocationMap)
+	xml.Unmarshal(getResource(airportCode, "Carousels"), &carousels)
+	addResourcesToMap(carousels.Values, GetRepo(airportCode).CarouselAllocationMap)
 
 	var chutes FixedResources
-	xml.Unmarshal(getResource(*repo, "Chutes"), &chutes)
-	chuteAllocationMap = addResourcesToMap(chutes.Values, chuteAllocationMap)
-
-	repo.CheckInAllocationMap = checkInAllocationMap
-	repo.StandAllocationMap = standAllocationMap
-	repo.CarouselAllocationMap = carouselAllocationMap
-	repo.GateAllocationMap = gateAllocationMap
-	repo.ChuteAllocationMap = chuteAllocationMap
-
-	repoMap[repo.Airport] = *repo
-
-	resourceWG.Done()
+	xml.Unmarshal(getResource(airportCode, "Chutes"), &chutes)
+	addResourcesToMap(chutes.Values, GetRepo(airportCode).ChuteAllocationMap)
 }
-func initRepository(repo *Repository) {
-
-	// Break up the window into smaller chunks to avoid timeouts or single big hit
-	//
-	chunkSize := repo.ChunkSize
-	if chunkSize < 1 {
-		chunkSize = 2
-	}
-
-	var resourceWG sync.WaitGroup
-	resourceWG.Add(1)
-	go populateResourceMaps(repo, &resourceWG)
-
-	// Retrieve the current flights
-	repoMutex.Lock()
-	for min := repo.WindowMin; min <= repo.WindowMax; min += chunkSize {
-		var envel Envelope
-		xml.Unmarshal(getFlights(*repo, min, min+chunkSize), &envel)
-
-		//Wait until the Resource have all been gotten
-		resourceWG.Wait()
-
-		//		if entry, ok := repoMap[repo.Airport]; ok {
-		for _, flight := range envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight {
-			flight.LastUpdate = time.Now()
-			repo.Flights[flight.GetFlightID()] = flight
-			repo.FlightList.insert(flight)
-			upadateAllocation(flight, repo)
-		}
-		//			repoMap[repo.Airport] = entry
-		//		}
-	}
-
-	fmt.Println("Repository loaded for ", repo.Airport, "  Number of flights = ", len(repoMap[repo.Airport].Flights))
-
-	entry, _ := repoMap[repo.Airport]
-
-	from := time.Now().AddDate(0, 0, repo.WindowMin)
-	to := time.Now().AddDate(0, 0, repo.WindowMax)
-
-	entry.CurrentLowerLimit = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
-	entry.CurrentUpperLimit = time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, to.Location())
-
-	repoMap[repo.Airport] = entry
-
-	repoMutex.Unlock()
-
-	go maintainRepository(*repo)
-
-}
-
-func maintainRepository(repo Repository) {
+func maintainRepository(airportCode string) {
 
 	// Schedule the regular refresh
-	go scheduleUpdates(repo)
+	go scheduleUpdates(airportCode)
 
 	//Listen to the notification queue
 	opts := []msmq.QueueInfoOption{
-		msmq.WithPathName(repo.ListenerQueue),
+		msmq.WithPathName(GetRepo(airportCode).ListenerQueue),
 	}
 	queueInfo, err := msmq.NewQueueInfo(opts...)
 	if err != nil {
@@ -206,74 +179,99 @@ func maintainRepository(repo Repository) {
 			continue
 		}
 
-		//fileContent, err := os.Open("c:\\Users\\dave_\\Desktop\\test.xml")
-
-		// if err != nil {
-		// 	log.Fatal(err)
-		// 	return
-		// }
-
-		//defer fileContent.Close()
-
-		//byteResult, _ := ioutil.ReadAll(fileContent)
-
 		message, err := msg.Body()
 
-		//message := string(byteResult)
 		if strings.Contains(message, "FlightUpdatedNotification") {
-			updateFlightEntry(message, repo)
+			updateFlightEntry(message, airportCode)
 			continue
 		}
 		if strings.Contains(message, "FlightCreatedNotification") {
-			createFlightEntry(message, repo)
+			createFlightEntry(message, airportCode)
 			continue
 		}
 		if strings.Contains(message, "FlightDeletedNotification") {
-			deleteFlightEntry(message, repo)
+			deleteFlightEntry(message, airportCode)
 			continue
 		}
-		fmt.Println("Unhandled Message Type Received")
 	}
 }
-
-func scheduleUpdates(repo Repository) {
+func scheduleUpdates(airportCode string) {
 	// Schedule the regular refresh
-	s := gocron.NewScheduler(time.UTC)
-	s.Every(24).Hours().Do(func() { updateRepository(repo) })
+
+	loc, _ := time.LoadLocation("Local")
+	today := time.Now().Format("2006-01-02")
+	startTimeStr := today + "T" + serviceConfig.ScheduleUpdateJob
+	startTime, _ := time.ParseInLocation("2006-01-02T15:04:05", startTimeStr, loc)
+
+	s := gocron.NewScheduler(time.Local)
+	s.Every(serviceConfig.ScheduleUpdateJobIntervalInHours).Hours().StartAt(startTime).Do(func() { updateRepository(airportCode) })
+	s.Every(1).Millisecond().LimitRunsTo(1).Do(func() { updateRepository(airportCode) })
 	fmt.Println("Scheduled")
 	s.StartBlocking()
 }
+func updateRepository(airportCode string) {
 
-func updateRepository(repo Repository) {
+	repo := GetRepo(airportCode)
+	chunkSize := repo.ChunkSize
+	if chunkSize < 1 {
+		chunkSize = 2
+	}
 
-	fmt.Println("Maintinaing Repository:", repo.Airport)
-	var envel Envelope
-	xml.Unmarshal(getFlights(repo), &envel)
+	if isDebug {
+		elog.Info(1, fmt.Sprintf("Scheduled Maintenance of Repository: %s, Flight Chnk Size: %v ", airportCode, chunkSize))
+	}
 
 	repoMutex.Lock()
 	defer repoMutex.Unlock()
 
-	if entry, ok := repoMap[repo.Airport]; ok {
+	for min := GetRepo(airportCode).WindowMin; min <= GetRepo(airportCode).WindowMax; min += chunkSize {
+		var envel Envelope
+		xml.Unmarshal(getFlights(airportCode, min, min+chunkSize), &envel)
+
 		for _, flight := range envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight {
 			flight.LastUpdate = time.Now()
-			entry.Flights[flight.GetFlightID()] = flight
+			GetRepo(airportCode).Flights[flight.GetFlightID()] = flight
+			upadateAllocation(flight, airportCode)
+			//flightUpdatedChannel <- flight
 		}
 
-		from := time.Now().AddDate(0, 0, repo.WindowMin)
-		to := time.Now().AddDate(0, 0, repo.WindowMax)
-
-		entry.CurrentLowerLimit = time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location())
-		entry.CurrentUpperLimit = time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, to.Location())
-
-		repoMap[repo.Airport] = entry
-
-		fmt.Println("Repository updated for ", repo.Airport, "  Number of flights = ", len(entry.Flights))
-
+		flightsInitChannel <- len(envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight)
 	}
+
+	from := time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMin)
+	to := time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMax)
+
+	GetRepo(airportCode).updateLowerLimit(time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location()))
+	GetRepo(airportCode).updateUpperLimit(time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, to.Location()))
+
+	if isDebug {
+		fmt.Println("Repository updated for ", airportCode, "  Number of flights = ", len(GetRepo(airportCode).Flights))
+	}
+	cleanRepository(from, airportCode)
 }
+func cleanRepository(from time.Time, airportCode string) {
 
-func updateFlightEntry(message string, repo Repository) {
+	// Cleans the repository of old entries
 
+	fmt.Println("Cleaning repository from ", from)
+	flights := GetRepo(airportCode).Flights
+	remove := []Flight{}
+
+	for _, f := range flights {
+		if f.GetSTO().Before(from) {
+			deleteAllocation(f, airportCode)
+			remove = append(remove, f)
+		}
+	}
+
+	for _, f := range remove {
+		delete(GetRepo(airportCode).Flights, f.GetFlightID())
+	}
+	fmt.Println("Repository Cleaned for ", airportCode, "  Number of flights = ", len(remove))
+}
+func updateFlightEntry(message string, airportCode string) {
+
+	repo := GetRepo(airportCode)
 	var envel FlightUpdatedNotificatioEnvelope
 	xml.Unmarshal([]byte(message), &envel)
 
@@ -294,17 +292,16 @@ func updateFlightEntry(message string, repo Repository) {
 	flightID := flight.GetFlightID()
 
 	repoMutex.Lock()
-	if airportentry, ok := repoMap[repo.Airport]; ok {
-		airportentry.Flights[flightID] = flight
-	}
+
+	GetRepo(airportCode).Flights[flightID] = flight
 	repoMutex.Unlock()
 
-	upadateAllocation(flight, &repo)
+	upadateAllocation(flight, airportCode)
 
 	flightUpdatedChannel <- envel.Content.FlightUpdatedNotification.Flight
-
 }
-func createFlightEntry(message string, repo Repository) {
+func createFlightEntry(message string, airportCode string) {
+
 	var envel FlightCreatedNotificatioEnvelope
 	xml.Unmarshal([]byte(message), &envel)
 
@@ -313,22 +310,25 @@ func createFlightEntry(message string, repo Repository) {
 
 	sdot := flight.GetSDO()
 
-	if sdot.Before(time.Now().AddDate(0, 0, repo.WindowMin-2)) {
+	if sdot.Before(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMin-2)) {
 		log.Println("Create for Flight Before Window")
 		return
 	}
-	if sdot.After(time.Now().AddDate(0, 0, repo.WindowMax+2)) {
+	if sdot.After(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMax+2)) {
 		log.Println("Create for Flight After Window")
 		return
 	}
 	repoMutex.Lock()
-	repoMap[repo.Airport].Flights[flight.GetFlightID()] = flight
+	GetRepo(airportCode).Flights[flight.GetFlightID()] = flight
 	repoMutex.Unlock()
 
-	upadateAllocation(flight, &repo)
+	upadateAllocation(flight, airportCode)
 	flightCreatedChannel <- envel.Content.FlightCreatedNotification.Flight
 }
-func deleteFlightEntry(message string, repo Repository) {
+func deleteFlightEntry(message string, airportCode string) {
+
+	//repo := repoMap[airportCode]
+
 	var envel FlightDeletedNotificatioEnvelope
 	xml.Unmarshal([]byte(message), &envel)
 
@@ -336,21 +336,17 @@ func deleteFlightEntry(message string, repo Repository) {
 	flightID := flight.GetFlightID()
 
 	repoMutex.Lock()
-	if airportentry, ok := repoMap[repo.Airport]; ok {
-		delete(airportentry.Flights, flightID)
-	}
+	//if airportentry, ok := repoMap[repo.Airport]; ok {
+	delete(GetRepo(airportCode).Flights, flightID)
+	//}
 	repoMutex.Unlock()
 
-	deleteAllocation(flight, &repo)
+	deleteAllocation(flight, airportCode)
 	flightDeletedChannel <- envel.Content.FlightDeletedNotification.Flight
 }
+func getFlights(airportCode string, values ...int) []byte {
 
-func updateRepositoryWindow(repo Repository) {
-
-}
-
-func getFlights(repo Repository, values ...int) []byte {
-
+	repo := GetRepo(airportCode)
 	from := time.Now().AddDate(0, 0, repo.WindowMin).Format("2006-01-02")
 	to := time.Now().AddDate(0, 0, repo.WindowMax+1).Format("2006-01-02")
 
@@ -392,8 +388,131 @@ func getFlights(repo Repository, values ...int) []byte {
 
 	return resBody
 }
+func upadateAllocation(flight Flight, airportCode string) {
 
-func getResource(repo Repository, resourceType string) []byte {
+	repo := GetRepo(airportCode)
+	// It's too messy to do CRUD operations, so just delete all the allocations and then create them again from the current message
+
+	deleteAllocation(flight, airportCode)
+
+	flightId := flight.GetFlightID()
+	direction := flight.GetFlightDirection()
+	route := flight.GetFlightRoute()
+	aircraftType := flight.GetAircraftType()
+	aircraftRegistration := flight.GetAircraftRegistration()
+	now := time.Now().Local()
+
+	for _, checkInSlot := range flight.FlightState.CheckInSlots.CheckInSlot {
+		checkInID, start, end := checkInSlot.getResourceID()
+
+		_, ok := repo.CheckInAllocationMap[checkInID]
+		if ok {
+			repo.CheckInAllocationMap[checkInID].FlightAllocationsMap[flightId] = AllocationItem{
+				From:                 start,
+				To:                   end,
+				FlightID:             flightId,
+				AirportCode:          airportCode,
+				Direction:            direction,
+				Route:                route,
+				AircraftType:         aircraftType,
+				AircraftRegistration: aircraftRegistration,
+				LastUpdate:           now}
+		}
+	}
+
+	for _, gateSlot := range flight.FlightState.GateSlots.GateSlot {
+		gateID, start, end := gateSlot.getResourceID()
+		_, ok := repo.GateAllocationMap[gateID]
+		if ok {
+			repo.GateAllocationMap[gateID].FlightAllocationsMap[flightId] = AllocationItem{
+				From:                 start,
+				To:                   end,
+				FlightID:             flightId,
+				AirportCode:          airportCode,
+				Direction:            direction,
+				Route:                route,
+				AircraftType:         aircraftType,
+				AircraftRegistration: aircraftRegistration,
+				LastUpdate:           now}
+		}
+	}
+
+	for _, standSlot := range flight.FlightState.StandSlots.StandSlot {
+		standID, start, end := standSlot.getResourceID()
+		_, ok := repo.StandAllocationMap[standID]
+		if ok {
+			repo.StandAllocationMap[standID].FlightAllocationsMap[flightId] = AllocationItem{
+				From:                 start,
+				To:                   end,
+				FlightID:             flightId,
+				AirportCode:          airportCode,
+				Direction:            direction,
+				Route:                route,
+				AircraftType:         aircraftType,
+				AircraftRegistration: aircraftRegistration,
+				LastUpdate:           now}
+		}
+	}
+
+	for _, carouselSlot := range flight.FlightState.CarouselSlots.CarouselSlot {
+		carouselID, start, end := carouselSlot.getResourceID()
+		_, ok := repo.CarouselAllocationMap[carouselID]
+		if ok {
+			repo.CarouselAllocationMap[carouselID].FlightAllocationsMap[flightId] = AllocationItem{
+				From:                 start,
+				To:                   end,
+				FlightID:             flightId,
+				AirportCode:          airportCode,
+				Direction:            direction,
+				Route:                route,
+				AircraftType:         aircraftType,
+				AircraftRegistration: aircraftRegistration,
+				LastUpdate:           now}
+		}
+	}
+
+	for _, chuteSlot := range flight.FlightState.ChuteSlots.ChuteSlot {
+		chuteID, start, end := chuteSlot.getResourceID()
+		_, ok := repo.ChuteAllocationMap[chuteID]
+		if ok {
+			repo.ChuteAllocationMap[chuteID].FlightAllocationsMap[flightId] = AllocationItem{
+				From:                 start,
+				To:                   end,
+				FlightID:             flightId,
+				AirportCode:          airportCode,
+				Direction:            direction,
+				Route:                route,
+				AircraftType:         aircraftType,
+				AircraftRegistration: aircraftRegistration,
+				LastUpdate:           now}
+		}
+	}
+}
+
+func deleteAllocation(flight Flight, airportCode string) {
+
+	repo := GetRepo(airportCode)
+	flightId := flight.GetFlightID()
+
+	for _, v := range repo.CheckInAllocationMap {
+		delete(v.FlightAllocationsMap, flightId)
+	}
+	for _, v := range repo.GateAllocationMap {
+		delete(v.FlightAllocationsMap, flightId)
+	}
+	for _, v := range repo.StandAllocationMap {
+		delete(v.FlightAllocationsMap, flightId)
+	}
+	for _, v := range repo.CarouselAllocationMap {
+		delete(v.FlightAllocationsMap, flightId)
+	}
+	for _, v := range repo.ChuteAllocationMap {
+		delete(v.FlightAllocationsMap, flightId)
+	}
+}
+func getResource(airportCode string, resourceType string) []byte {
+
+	repo := GetRepo(airportCode)
 
 	url := repo.RestURL + "/" + repo.Airport + "/" + resourceType
 

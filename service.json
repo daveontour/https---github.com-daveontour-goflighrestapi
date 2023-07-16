@@ -2,5 +2,8 @@
     "servicename": "aagetflightservice",
     "servicedisplayname": "AAA GetFlight Rest API",
     "servicedescription": "A  HTTP/JSON  Rest Service for retrieving flights from AMS",
-    "serviceipport":"127.0.0.1:8081"
+    "serviceipport":"127.0.0.1:8081",
+    "scheduleUpdateJob":"02:00:00",
+    "scheduleUpdateJobIntervalInHours":24,
+    "debugService": false
 }

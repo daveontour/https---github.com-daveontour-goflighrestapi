@@ -16,19 +16,31 @@ import (
 	"golang.org/x/sys/windows/svc"
 )
 
-var repoMap = make(map[string]Repository)
+// var repoMap = make(map[string]Repository)
+var repoList []Repository
 var wg sync.WaitGroup
 
 var repoMutex sync.Mutex
+var mapMutex sync.Mutex
 var serviceConfig ServiceConfig
+var isDebug bool = false
 
 var repositoryUpdateChannel = make(chan int)
 var flightUpdatedChannel = make(chan Flight)
 var flightCreatedChannel = make(chan Flight)
 var flightDeletedChannel = make(chan Flight)
+var flightsInitChannel = make(chan int)
 
-var flightList = FlightList{}
+//var flightList = FlightList{}
 
+func GetRepo(airportCode string) *Repository {
+	for _, repo := range repoList {
+		if repo.Airport == airportCode {
+			return &repo
+		}
+	}
+	return nil
+}
 func usage(errmsg string) {
 	fmt.Fprintf(os.Stderr,
 		"%s\n\n"+
@@ -55,10 +67,17 @@ func getServiceConfig() ServiceConfig {
 	return serviceConfig
 }
 
+// func main() {
+
+// 	startGinServer()
+
+// }
+
 func main() {
 
 	serviceConfig = getServiceConfig()
 	svcName := serviceConfig.ServiceName
+	isDebug = serviceConfig.DebugService
 
 	flag.StringVar(&svcName, "name", svcName, "name of the service")
 	flag.Parse()
@@ -74,12 +93,12 @@ func main() {
 
 	if len(os.Args) < 2 {
 		usage("no command specified")
-		//runProgram()
 	}
 
 	cmd := strings.ToLower(os.Args[1])
 	switch cmd {
 	case "debug":
+		isDebug = true
 		runService(svcName, true)
 		return
 	case "install":
@@ -102,53 +121,3 @@ func main() {
 	}
 	return
 }
-
-// func testDupAndPrune(flight Flight) {
-
-// 	flDup := flight.DuplicateFlight()
-
-// 	properties := make(map[string]string)
-
-// 	for _, p := range flDup.FlightState.Value {
-// 		properties[p.PropertyName] = p.Text
-// 	}
-
-// 	flDup.FlightState.Value = []Value{}
-
-// 	allowedCustomFields := []string{"FlightUniqueID", "SYS_ETA", "de--_ActualArrival_Source00"}
-
-// 	for _, property := range allowedCustomFields {
-// 		data, ok := properties[property]
-
-// 		if ok {
-// 			flDup.FlightState.Value = append(flDup.FlightState.Value, Value{property, data})
-// 		}
-// 	}
-
-// 	changes := []Change{}
-
-// 	for ii := 0; ii < len(flDup.FlightChanges.Changes); ii++ {
-// 		ok := contains(allowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
-// 		if ok {
-// 			changes = append(changes, flDup.FlightChanges.Changes[ii])
-// 		}
-// 	}
-
-// 	flDup.FlightChanges.Changes = changes
-
-// 	b, err := json.MarshalIndent(flDup, "", "  ")
-// 	if err != nil {
-// 		fmt.Println(err)
-// 	} else {
-// 		fmt.Println(string(b))
-// 	}
-// }
-
-// func contains(elems []string, v string) bool {
-// 	for _, s := range elems {
-// 		if v == s {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }

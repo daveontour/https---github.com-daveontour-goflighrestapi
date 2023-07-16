@@ -329,7 +329,6 @@ func (ss GateSlots) MarshalJSON() ([]byte, error) {
 	}
 
 	sb.WriteString("]")
-	fmt.Println(sb.String())
 
 	return []byte(sb.String()), nil
 
@@ -717,9 +716,10 @@ func (f Flight) GetAircraftRegistration() string {
 func (f Flight) GetSTO() time.Time {
 
 	sto := f.FlightState.ScheduledTime
+	loc, _ := time.LoadLocation("Local")
 
 	if sto != "" {
-		stot, err := time.Parse("2006-01-02T15:04:05", sto)
+		stot, err := time.ParseInLocation("2006-01-02T15:04:05", sto, loc)
 		if err == nil {
 			return stot
 		}

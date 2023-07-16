@@ -16,24 +16,72 @@ import (
 
 func startGinServer() {
 
-	gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.DebugMode)
 	router := gin.New()
 
 	router.GET("/getFlights/:apt", getRequestedFlights)
-	router.GET("/getCheckin/:apt/:checkIn", getCheckIn)
-
-	router.GET("/getResource/:apt/:resourceType/:resource", getResources)
-	router.GET("/getResources/:apt/:resourceType", getResources)
 	router.GET("/getResources/:apt", getResources)
-
-	router.GET("/getFlightResources/:apt/:flight", getResources)
-	router.GET("/getAirlineResources/:apt/:airline", getResources)
-
 	router.GET("/getConfiguredResources/:apt/:resourceType", getConfiguredResources)
 	router.GET("/getConfiguredResources/:apt", getConfiguredResources)
 
+	router.GET("/help", func(c *gin.Context) {
+		data, err := os.ReadFile("./help.html")
+		if err != nil {
+			// error handler
+		}
+		c.Header("Content-Type", "text/html")
+		_, _ = c.Writer.Write(data)
+	})
+
 	router.Run(serviceConfig.ServiceIPPort)
 
+	//router.Run(":8081")
+
+}
+
+func getUserProfile(c *gin.Context) UserProfile {
+
+	//Read read the file for each request so changes can be made without the need to restart the server
+
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	fileContent, err := os.Open(filepath.Join(exPath, "users.json"))
+
+	if err != nil {
+		elog.Error(99, "Error Reading "+filepath.Join(exPath, "users.json"))
+		elog.Error(99, err.Error())
+		return UserProfile{}
+	}
+
+	defer fileContent.Close()
+
+	byteResult, _ := ioutil.ReadAll(fileContent)
+
+	var users Users
+
+	json.Unmarshal([]byte(byteResult), &users)
+
+	keys := c.Request.Header["token"]
+	key := "default"
+
+	if keys != nil {
+		key = keys[0]
+	}
+
+	userProfile := UserProfile{}
+
+	for _, u := range users.Users {
+		if key == u.Key {
+			userProfile = u
+			break
+		}
+	}
+
+	return userProfile
 }
 
 func getConfiguredResources(c *gin.Context) {
@@ -74,8 +122,8 @@ func getConfiguredResources(c *gin.Context) {
 	}
 
 	// Check that the requested airport exists in the repository
-	_, ok := repoMap[apt]
-	if !ok {
+	//_, ok := repoMap[apt]
+	if GetRepo(apt) == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Airport %s not found", apt)})
 		return
 	}
@@ -85,11 +133,11 @@ func getConfiguredResources(c *gin.Context) {
 	var alloc = []ConfiguredResourceResponseItem{}
 
 	allocMaps := []map[string]ResourceAllocationMap{
-		repoMap[apt].CheckInAllocationMap,
-		repoMap[apt].GateAllocationMap,
-		repoMap[apt].StandAllocationMap,
-		repoMap[apt].ChuteAllocationMap,
-		repoMap[apt].CarouselAllocationMap}
+		GetRepo(apt).CheckInAllocationMap,
+		GetRepo(apt).GateAllocationMap,
+		GetRepo(apt).StandAllocationMap,
+		GetRepo(apt).ChuteAllocationMap,
+		GetRepo(apt).CarouselAllocationMap}
 
 	for idx, allocMap := range allocMaps {
 
@@ -140,11 +188,26 @@ func getConfiguredResources(c *gin.Context) {
 
 func getResources(c *gin.Context) {
 
-	flightID := c.Param("flight")
 	apt := c.Param("apt")
-	airline := c.Param("airline")
-	resourceType := c.Param("resourceType")
-	resource := c.Param("resource")
+
+	flightID := c.Query("flight")
+	if flightID == "" {
+		flightID = c.Query("flt")
+	}
+
+	airline := c.Query("airline")
+	if airline == "" {
+		airline = c.Query("al")
+	}
+	resourceType := c.Query("resourceType")
+	if resourceType == "" {
+		resourceType = c.Query("rt")
+	}
+	resource := c.Query("resource")
+	if resource == "" {
+		resource = c.Query("id")
+	}
+
 	from := c.Query("from")
 	to := c.Query("to")
 	updatedSince := c.Query("updatedSince")
@@ -195,8 +258,8 @@ func getResources(c *gin.Context) {
 	}
 
 	// Check that the requested airport exists in the repository
-	_, ok := repoMap[apt]
-	if !ok {
+	//_, ok := repoMap[apt]
+	if GetRepo(apt) == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Airport %s not found", apt)})
 		return
 	}
@@ -206,29 +269,29 @@ func getResources(c *gin.Context) {
 	var alloc = []AllocationResponseItem{}
 
 	allocMaps := []map[string]ResourceAllocationMap{
-		repoMap[apt].CheckInAllocationMap,
-		repoMap[apt].GateAllocationMap,
-		repoMap[apt].StandAllocationMap,
-		repoMap[apt].ChuteAllocationMap,
-		repoMap[apt].CarouselAllocationMap}
+		GetRepo(apt).CheckInAllocationMap,
+		GetRepo(apt).GateAllocationMap,
+		GetRepo(apt).StandAllocationMap,
+		GetRepo(apt).ChuteAllocationMap,
+		GetRepo(apt).CarouselAllocationMap}
 
 	for idx, allocMap := range allocMaps {
 
 		//If a resource type has been specified, ignore the rest
 		if resourceType != "" {
-			if resourceType == "Checkin" && idx != 0 {
+			if strings.ToLower(resourceType) == "checkin" && idx != 0 {
 				continue
 			}
-			if resourceType == "Gate" && idx != 1 {
+			if strings.ToLower(resourceType) == "gate" && idx != 1 {
 				continue
 			}
-			if resourceType == "Stand" && idx != 2 {
+			if strings.ToLower(resourceType) == "stand" && idx != 2 {
 				continue
 			}
-			if resourceType == "Chute" && idx != 3 {
+			if strings.ToLower(resourceType) == "chute" && idx != 3 {
 				continue
 			}
-			if resourceType == "Carousel" && idx != 4 {
+			if strings.ToLower(resourceType) == "carousel" && idx != 4 {
 				continue
 			}
 		}
@@ -313,124 +376,14 @@ func getResources(c *gin.Context) {
 
 }
 
-func getCheckIn(c *gin.Context) {
-
-	checkIn := c.Param("checkIn")
-	apt := c.Param("apt")
-
-	// Create the response object so we can return early if required
-	response := ResourceResponse{}
-	c.Writer.Header().Set("Content-Type", "application/json")
-
-	var err error
-
-	// Get the profile of the user making the request
-	userProfile := getUserProfile(c)
-	response.User = userProfile.UserName
-
-	// Set Default airport if none set
-	if apt == "" && userProfile.DefaultAirport != "" {
-		apt = userProfile.DefaultAirport
-	}
-
-	//Check that the user is allowed to access the requested airport
-	if !contains(userProfile.AllowedAirlines, apt) &&
-		!contains(userProfile.AllowedAirlines, "*") {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": "User is not permitted to access airport %s"})
-		return
-	}
-
-	// Check that the requested airport exists in the repository
-	_, ok := repoMap[apt]
-	if !ok {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Airport %s not found", apt)})
-		return
-	}
-
-	response.AirportCode = apt
-
-	var alloc = []AllocationResponseItem{}
-
-	mapp := repoMap[apt].CheckInAllocationMap[checkIn]
-	for _, v := range repoMap[apt].CheckInAllocationMap[checkIn].FlightAllocationsMap {
-		n := AllocationResponseItem{
-			AllocationItem: AllocationItem{From: v.From, To: v.To, FlightID: v.FlightID, LastUpdate: v.LastUpdate}, ResourceType: mapp.Resource.ResourceTypeCode, Name: mapp.Resource.Name, Area: mapp.Resource.Area,
-		}
-
-		alloc = append(alloc, n)
-	}
-
-	sort.Slice(alloc, func(i, j int) bool {
-		return alloc[i].From.Before(alloc[j].From)
-	})
-
-	response.Allocations = alloc
-
-	// Get the filtered and pruned flights for the request
-	//response, err = filterFlights(request, response, repoMap[apt].Flights, c)
-
-	if err == nil {
-		c.JSON(http.StatusOK, response)
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", err.Error())})
-	}
-
-}
-
-func getRequestedFlights2(c *gin.Context) {
-	c.Writer.Header().Set("Content-Type", "application/json")
-	c.JSON(http.StatusOK, gin.H{"Message": "All OK"})
-}
-func getUserProfile(c *gin.Context) UserProfile {
-
-	//Read read the file for each request so changes can be made without the need to restart the server
-
-	ex, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	exPath := filepath.Dir(ex)
-
-	fileContent, err := os.Open(filepath.Join(exPath, "users.json"))
-
-	if err != nil {
-		elog.Error(99, "Error Reading "+filepath.Join(exPath, "users.json"))
-		elog.Error(99, err.Error())
-		return UserProfile{}
-	}
-
-	defer fileContent.Close()
-
-	byteResult, _ := ioutil.ReadAll(fileContent)
-
-	var users Users
-
-	json.Unmarshal([]byte(byteResult), &users)
-
-	keys := c.Request.Header["token"]
-	key := "default"
-
-	if keys != nil {
-		key = keys[0]
-	}
-
-	userProfile := UserProfile{}
-
-	for _, u := range users.Users {
-		if key == u.Key {
-			userProfile = u
-			break
-		}
-	}
-
-	return userProfile
-}
-
 func getRequestedFlights(c *gin.Context) {
 
 	apt := c.Param("apt")
 
-	direction := strings.ToUpper(c.Query("type"))
+	direction := strings.ToUpper(c.Query("direction"))
+	if direction == "" {
+		direction = strings.ToUpper(c.Query("d"))
+	}
 	airline := c.Query("al")
 	from := c.Query("from")
 	to := c.Query("to")
@@ -443,7 +396,12 @@ func getRequestedFlights(c *gin.Context) {
 
 	// Add the flights the response object and return nil for errors
 	if direction != "" {
-		response.Direction = direction
+		if strings.HasPrefix(direction, "A") {
+			response.Direction = "Arrival"
+		}
+		if strings.HasPrefix(direction, "D") {
+			response.Direction = "Departure"
+		}
 	} else {
 		response.Direction = "ARR/DEP"
 	}
@@ -481,8 +439,8 @@ func getRequestedFlights(c *gin.Context) {
 	}
 
 	// Check that the requested airport exists in the repository
-	_, ok := repoMap[apt]
-	if !ok {
+	//	_, ok := repoMap[apt]
+	if GetRepo(apt) == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("Airport %s not found", apt)})
 		return
 	}
@@ -505,7 +463,7 @@ func getRequestedFlights(c *gin.Context) {
 	}
 
 	// Get the filtered and pruned flights for the request
-	response, err = filterFlights(request, response, repoMap[apt].Flights, c)
+	response, err = filterFlights(request, response, GetRepo(apt).Flights, c)
 
 	if err == nil {
 		c.JSON(http.StatusOK, response)
@@ -612,33 +570,32 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 		}
 	}
 
+	allowedAllAirline := false
+	if request.UserProfile.AllowedAirlines != nil {
+		if contains(request.UserProfile.AllowedAirlines, "*") {
+			allowedAllAirline = true
+		}
+	}
+
+NextFlight:
 	for _, f := range flights {
 
-		passQueryCheck := true
 		for _, queryableParameter := range request.PresentQueryableParameters {
 			queryValue := queryableParameter.Value
 			flightValue := f.GetProperty(queryableParameter.Parameter)
 			if flightValue == "" {
-				passQueryCheck = false
-				continue
+				break NextFlight
 			}
 			if queryValue != flightValue {
-				passQueryCheck = false
-				continue
-			} else {
-				passQueryCheck = true
+				break NextFlight
 			}
-		}
-
-		if !passQueryCheck {
-			continue
 		}
 
 		// Flight direction filter
-		if (request.Direction == "DEP") && f.IsArrival() {
+		if strings.HasPrefix(request.Direction, "D") && f.IsArrival() {
 			continue
 		}
-		if (request.Direction == "ARR") && !f.IsArrival() {
+		if strings.HasPrefix(request.Direction, "A") && !f.IsArrival() {
 			continue
 		}
 
@@ -666,10 +623,11 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 
 		// Filter out airlines that the user is not allowed to see
 		// "*" entry in AllowedAirlines allows all.
-		if request.UserProfile.AllowedAirlines != nil {
-			if !contains(request.UserProfile.AllowedAirlines, f.GetIATAAirline()) &&
-				!contains(request.UserProfile.AllowedAirlines, "*") {
-				continue
+		if !allowedAllAirline {
+			if request.UserProfile.AllowedAirlines != nil {
+				if !contains(request.UserProfile.AllowedAirlines, f.GetIATAAirline()) {
+					continue
+				}
 			}
 		}
 
@@ -677,6 +635,10 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 		// function removed any message elements that the user is not allowed to see
 		returnFlights = append(returnFlights, prune(f, request))
 	}
+
+	sort.Slice(returnFlights, func(i, j int) bool {
+		return returnFlights[i].GetSTO().Before(returnFlights[j].GetSTO())
+	})
 
 	response.Flights = returnFlights
 	response.NumberOfFlights = len(returnFlights)
@@ -701,14 +663,7 @@ func prune(flight Flight, request Request) Flight {
 
 	if request.UserProfile.AllowedCustomFields != nil {
 		if contains(request.UserProfile.AllowedCustomFields, "*") {
-			// No restriction is defined on the custom fields, so let it rip
-			for _, property := range flight.FlightState.Value {
-				data := flight.GetProperty(property.PropertyName)
-
-				if data != "" {
-					flDup.FlightState.Value = append(flDup.FlightState.Value, Value{property.PropertyName, data})
-				}
-			}
+			flDup.FlightState.Value = flight.FlightState.Value
 		} else {
 			for _, property := range request.UserProfile.AllowedCustomFields {
 				data := flight.GetProperty(property)

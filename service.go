@@ -9,11 +9,14 @@ package main
 
 import (
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
+
+	// "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc/eventlog"
 )
 
@@ -67,9 +70,6 @@ loop:
 	changes <- svc.Status{State: svc.StopPending}
 	return
 }
-func beep() {
-	elog.Info(1, "beep")
-}
 
 func runService(name string, isDebug bool) {
 	var err error
@@ -98,44 +98,38 @@ func runService(name string, isDebug bool) {
 
 func runProgram() {
 
-	//numCPU := runtime.NumCPU()
+	numCPU := runtime.NumCPU()
 
-	//elog.Info(1, fmt.Sprintf("Number of CPUs = %s", numCPU))
-	// wg.Add(1)
-
-	// fmt.Println("Number of cores available = ", numCPU)
-	// runtime.GOMAXPROCS(runtime.NumCPU())
-
+	if isDebug {
+		elog.Info(1, fmt.Sprintf("Number of cores available = %v", numCPU))
+	}
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	wg.Add(1)
 	go startGinServer()
-	go cup()
+	go eventMonitor()
 	go InitRepositories()
-
-	// elog.Info(1, "Before the Wait")
-	// wg.Wait()
-	// elog.Info(1, "After the Wait")
-
+	wg.Wait()
 }
 
-func cup() {
+func eventMonitor() {
 
-	isDebug := false
 	for {
 		select {
-		case c := <-repositoryUpdateChannel:
-			if isDebug {
-				fmt.Print("Repository Channel Update", c)
-			}
 		case flight := <-flightUpdatedChannel:
 			if isDebug {
-				fmt.Println("FlightUpdated:", flight.GetFlightID())
+				elog.Info(59, fmt.Sprintf("FlightUpdated: %s", flight.GetFlightID()))
 			}
 		case flight := <-flightDeletedChannel:
 			if isDebug {
-				fmt.Println("FlightDeleted:", flight.GetFlightID())
+				elog.Info(59, fmt.Sprintf("FlightDeleted: %s", flight.GetFlightID()))
 			}
 		case flight := <-flightCreatedChannel:
 			if isDebug {
-				fmt.Println("FlightCreated:", flight.GetFlightID())
+				elog.Info(59, fmt.Sprintf("FlightCreated: %s", flight.GetFlightID()))
+			}
+		case numflight := <-flightsInitChannel:
+			if isDebug {
+				elog.Info(59, fmt.Sprintf("Flight Initialised or Refreshed: %v", numflight))
 			}
 		}
 	}
