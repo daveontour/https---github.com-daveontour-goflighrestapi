@@ -1,13 +1,21 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +24,7 @@ import (
 
 func startGinServer() {
 
-	gin.SetMode(gin.DebugMode)
+	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 
 	router.GET("/getFlights/:apt", getRequestedFlights)
@@ -27,15 +35,71 @@ func startGinServer() {
 	router.GET("/help", func(c *gin.Context) {
 		data, err := os.ReadFile("./help.html")
 		if err != nil {
-			// error handler
+			return
 		}
 		c.Header("Content-Type", "text/html")
 		_, _ = c.Writer.Write(data)
 	})
 
-	router.Run(serviceConfig.ServiceIPPort)
+	if !serviceConfig.UseHTTPS {
 
-	//router.Run(":8081")
+		err := router.Run(serviceConfig.ServiceIPPort)
+		if err != nil {
+			logger.Fatal("Unable to start HTTP server.")
+			wg.Done()
+			os.Exit(2)
+		}
+
+	} else if serviceConfig.KeyFile != "" && serviceConfig.CertFile != "" {
+
+		server := http.Server{Addr: serviceConfig.ServiceIPPort, Handler: router}
+		err := server.ListenAndServeTLS(serviceConfig.CertFile, serviceConfig.KeyFile)
+		if err != nil {
+			logger.Fatal("Unable to start HTTPS server. Likely cause is that the keyFile or certFile were not found")
+			wg.Done()
+			os.Exit(2)
+		}
+
+	} else {
+
+		cert := &x509.Certificate{
+			SerialNumber: big.NewInt(1658),
+			Subject: pkix.Name{
+				Organization:  []string{"ORGANIZATION_NAME"},
+				Country:       []string{"COUNTRY_CODE"},
+				Province:      []string{"PROVINCE"},
+				Locality:      []string{"CITY"},
+				StreetAddress: []string{"ADDRESS"},
+				PostalCode:    []string{"POSTAL_CODE"},
+			},
+			NotBefore:    time.Now(),
+			NotAfter:     time.Now().AddDate(10, 0, 0),
+			SubjectKeyId: []byte{1, 2, 3, 4, 6},
+			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageServerAuth},
+			KeyUsage:     x509.KeyUsageDigitalSignature,
+		}
+		priv, _ := rsa.GenerateKey(rand.Reader, 2048)
+		pub := &priv.PublicKey
+
+		// Sign the certificate
+		certificate, _ := x509.CreateCertificate(rand.Reader, cert, cert, pub, priv)
+
+		certBytes := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate})
+		keyBytes := pem.EncodeToMemory(&pem.Block{Type: "RSA PRIVATE KEY", Bytes: x509.MarshalPKCS1PrivateKey(priv)})
+
+		// Generate a key pair from your pem-encoded cert and key ([]byte).
+		x509Cert, _ := tls.X509KeyPair(certBytes, keyBytes)
+
+		tlsConfig := &tls.Config{Certificates: []tls.Certificate{x509Cert}}
+		server := http.Server{Addr: serviceConfig.ServiceIPPort, Handler: router, TLSConfig: tlsConfig}
+
+		err := server.ListenAndServeTLS("", "")
+		if err != nil {
+			logger.Fatal("Unable to start HTTPS server with local certificates and key")
+			wg.Done()
+			os.Exit(2)
+		}
+	}
 
 }
 
@@ -52,8 +116,8 @@ func getUserProfile(c *gin.Context) UserProfile {
 	fileContent, err := os.Open(filepath.Join(exPath, "users.json"))
 
 	if err != nil {
-		elog.Error(99, "Error Reading "+filepath.Join(exPath, "users.json"))
-		elog.Error(99, err.Error())
+		logger.Error("Error Reading " + filepath.Join(exPath, "users.json"))
+		logger.Error(err.Error())
 		return UserProfile{}
 	}
 
@@ -203,6 +267,7 @@ func getResources(c *gin.Context) {
 	if resourceType == "" {
 		resourceType = c.Query("rt")
 	}
+
 	resource := c.Query("resource")
 	if resource == "" {
 		resource = c.Query("id")
@@ -217,22 +282,50 @@ func getResources(c *gin.Context) {
 	response := ResourceResponse{}
 	c.Writer.Header().Set("Content-Type", "application/json")
 
+	if resourceType != "" {
+		response.ResourceType = resourceType
+	} else {
+		response.ResourceType = "All Resource Types"
+	}
+
+	if resource != "" {
+		response.ResourceID = resource
+	} else {
+		response.ResourceID = "All"
+	}
+
+	if flightID != "" {
+		response.FlightID = flightID
+	} else {
+		response.FlightID = "All Flights"
+	}
+
+	if airline != "" {
+		response.Airline = airline
+	} else {
+		response.Airline = "All Airlines"
+	}
+
 	if resourceType != "" && !strings.Contains("Checkin Gate Stand Carousel Chute", resourceType) {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid resouce type specified. "})
 		return
 	}
 
-	fromTime, fromErr := time.ParseInLocation("2006-01-02T15:04:05", from, loc)
-	if fromErr != nil && from != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid 'from' time specified. "})
-		return
+	fromOffset, fromErr := strconv.Atoi(from)
+	if fromErr != nil {
+		fromOffset = -12
 	}
 
-	toTime, toErr := time.ParseInLocation("2006-01-02T15:04:05", to, loc)
-	if toErr != nil && to != "" {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid 'to' time specified. "})
-		return
+	fromTime := time.Now().Add(time.Hour * time.Duration(fromOffset))
+	response.FromResource = fromTime.Format("2006-01-02T15:04:05")
+
+	toOffset, toErr := strconv.Atoi(to)
+	if toErr != nil {
+		toOffset = 24
 	}
+
+	toTime := time.Now().Add(time.Hour * time.Duration(toOffset))
+	response.ToResource = toTime.Format("2006-01-02T15:04:05")
 
 	updatedSinceTime, updatedSinceErr := time.ParseInLocation("2006-01-02T15:04:05", updatedSince, loc)
 	if updatedSinceErr != nil && updatedSince != "" {
@@ -319,43 +412,40 @@ func getResources(c *gin.Context) {
 					test = true
 				}
 
-				if test {
-
-					// Window of interest processing
-					if fromErr == nil {
-						if v.To.Before(fromTime) {
-							continue
-						}
-					}
-
-					if toErr == nil {
-						if v.From.After(toTime) {
-							continue
-						}
-					}
-
-					if updatedSinceErr == nil {
-						if v.LastUpdate.Before(updatedSinceTime) {
-							continue
-						}
-					}
-
-					n := AllocationResponseItem{
-						AllocationItem: AllocationItem{From: v.From,
-							To:                   v.To,
-							FlightID:             v.FlightID,
-							Direction:            v.Direction,
-							Route:                v.Route,
-							AircraftType:         v.AircraftType,
-							AircraftRegistration: v.AircraftRegistration,
-							LastUpdate:           v.LastUpdate},
-						ResourceType: mapp.Resource.ResourceTypeCode,
-						Name:         mapp.Resource.Name,
-						Area:         mapp.Resource.Area,
-					}
-					alloc = append(alloc, n)
+				if !test {
+					continue
 				}
+
+				if v.To.Before(fromTime) {
+					continue
+				}
+
+				if v.From.After(toTime) {
+					continue
+				}
+
+				if updatedSinceErr == nil {
+					if v.LastUpdate.Before(updatedSinceTime) {
+						continue
+					}
+				}
+
+				n := AllocationResponseItem{
+					AllocationItem: AllocationItem{From: v.From,
+						To:                   v.To,
+						FlightID:             v.FlightID,
+						Direction:            v.Direction,
+						Route:                v.Route,
+						AircraftType:         v.AircraftType,
+						AircraftRegistration: v.AircraftRegistration,
+						LastUpdate:           v.LastUpdate},
+					ResourceType: mapp.Resource.ResourceTypeCode,
+					Name:         mapp.Resource.Name,
+					Area:         mapp.Resource.Area,
+				}
+				alloc = append(alloc, n)
 			}
+
 		}
 	}
 
@@ -387,6 +477,10 @@ func getRequestedFlights(c *gin.Context) {
 	airline := c.Query("al")
 	from := c.Query("from")
 	to := c.Query("to")
+	route := strings.ToUpper(c.Query("route"))
+	if route == "" {
+		route = c.Query("r")
+	}
 
 	// Create the response object so we can return early if required
 	response := Response{}
@@ -405,6 +499,8 @@ func getRequestedFlights(c *gin.Context) {
 	} else {
 		response.Direction = "ARR/DEP"
 	}
+
+	response.Route = route
 
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c)
@@ -448,7 +544,7 @@ func getRequestedFlights(c *gin.Context) {
 	response.AirportCode = apt
 
 	// Build the request object
-	request := Request{Direction: direction, Airline: airline, From: from, To: to, UserProfile: userProfile}
+	request := Request{Direction: direction, Airline: airline, From: from, To: to, UserProfile: userProfile, Route: route}
 
 	// Reform the request based on the user Profile and the request parameters
 	request, response = normaliseRequest(request, response, c)
@@ -537,29 +633,26 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 	returnFlights := []Flight{}
 	loc, _ := time.LoadLocation("Local")
 
-	var from time.Time
-	var to time.Time
+	// var from time.Time
+	// var to time.Time
 	var updatedSinceTime time.Time
 
-	// Set up the time bounds if required. Return error to user if not well formed date
-	if request.From != "" {
-		f, err := time.ParseInLocation("2006-01-02T15:04:05", request.From, loc)
-		if err != nil {
-			return Response{}, err
-		} else {
-			from = f
-			response.From = f.String()
-		}
+	fromOffset, fromErr := strconv.Atoi(request.From)
+	if fromErr != nil {
+		fromOffset = -12
 	}
-	if (request.To) != "" {
-		t, err := time.ParseInLocation("2006-01-02T15:04:05", request.To, loc)
-		if err != nil {
-			return Response{}, err
-		} else {
-			to = t
-			response.To = t.String()
-		}
+
+	from := time.Now().Add(time.Hour * time.Duration(fromOffset))
+	response.From = from.Format("2006-01-02T15:04:05")
+
+	toOffset, toErr := strconv.Atoi(request.To)
+	if toErr != nil {
+		toOffset = 24
 	}
+
+	to := time.Now().Add(time.Hour * time.Duration(toOffset))
+	response.To = to.Format("2006-01-02T15:04:05")
+
 	if request.UpdatedSince != "" {
 		t, err := time.ParseInLocation("2006-01-02T15:04:05", request.UpdatedSince, loc)
 		if err != nil {
@@ -604,17 +697,22 @@ NextFlight:
 			continue
 		}
 
+		// RequestedRoute filter
+		if request.Route != "" && !strings.Contains(f.GetFlightRoute(), request.Route) {
+			continue
+		}
+
 		// STO window filters
-		if request.From != "" {
-			if f.GetSTO().Before(from) {
-				continue
-			}
+		//if request.From != "" {
+		if f.GetSTO().Before(from) {
+			continue
 		}
-		if request.To != "" {
-			if f.GetSTO().After(to) {
-				continue
-			}
+		//}
+		//if request.To != "" {
+		if f.GetSTO().After(to) {
+			continue
 		}
+		//}
 		if request.UpdatedSince != "" {
 			if f.LastUpdate.Before(updatedSinceTime) {
 				continue
