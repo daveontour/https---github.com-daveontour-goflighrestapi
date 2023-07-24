@@ -11,8 +11,10 @@ import (
 
 	"flag"
 
-	"log"
-
+	//"log"
+	"github.com/go-co-op/gocron"
+	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 )
 
@@ -25,11 +27,15 @@ var mapMutex sync.Mutex
 var serviceConfig ServiceConfig
 var isDebug bool = false
 
+var logger = logrus.New()
+
 var repositoryUpdateChannel = make(chan int)
 var flightUpdatedChannel = make(chan Flight)
 var flightCreatedChannel = make(chan Flight)
 var flightDeletedChannel = make(chan Flight)
 var flightsInitChannel = make(chan int)
+
+var schedulerMap = make(map[string]*gocron.Scheduler)
 
 //var flightList = FlightList{}
 
@@ -75,6 +81,8 @@ func getServiceConfig() ServiceConfig {
 
 func main() {
 
+	logger.SetLevel(log.InfoLevel)
+	logger.Info("STARTING PROGRAM")
 	serviceConfig = getServiceConfig()
 	svcName := serviceConfig.ServiceName
 	isDebug = serviceConfig.DebugService

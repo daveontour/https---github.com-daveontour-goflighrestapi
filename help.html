@@ -1,1 +1,84 @@
-<h1>Help File</h1>
+<html>
+
+<head>
+    <style>
+        .main {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div style="font-family: 'Courier New', Courier, monospace; margin-left: 5px;">
+        <p>
+            /getFlights
+        </p>
+
+        Parameters:<br />
+        <br />
+        <span class="main"> Airport</span> - Three letter IATA airport code to the desired airport<br />
+        <span class="main"> al or airline </span> - Two letter IATA code for the airline, eg. BA, DL, LH, MH (default:
+        all airlines)<br />
+        <span class="main"> d or direction</span> - number of hours relative to "now" to start looking for allocations, eg. -3
+        (default: -12)<br />
+        <span class="main"> r or route </span>- number of hours relative to "now" to stop looking for allocations, eg. 12
+        (default: 24)<br />
+        <span class="main"> from</span> - number of hours relative to "now" to start looking for allocations, eg. -3
+        (default: -12)<br />
+        <span class="main"> to </span>- number of hours relative to "now" to stop looking for allocations, eg. 12
+        (default: 24)<br />
+        </p>
+    <b>/getResources/[Airport]</b><br />
+
+        Parameters:<br />
+        <br />
+        <span class="main"> Airport</span> - Three letter IATA airport code to the desired airport<br />
+        <span class="main"> flt or flight</span> - Flight Number, eg. QF001, EK23, BA007 (default: all flights)<br />
+        <span class="main"> al or airline </span> - Two letter IATA code for the airline, eg. BA, DL, LH, MH (default:
+        all airlines)<br />
+        <span class="main"> rt or resourceType </span> - one of CheckIn, Gate, Stand, Carousel, Chute. (default: all
+        types are returned)<br />
+        <span class="main"> id or resource</span> - the name of the individual reource to query (default: all
+        resources)<br />
+        <span class="main"> from</span> - number of hours relative to "now" to start looking for allocations, eg. -3
+        (default: -12)<br />
+        <span class="main"> to </span>- number of hours relative to "now" to stop looking for allocations, eg. 12
+        (default: 24)<br />
+        <span class="main">updatedSince </span>- return records that have been updated from the date, e.g.
+        2023-07-16T13:00:00 <br />
+        <span class="main">{custom field name} </span>- return records that have been updated from the date, e.g.
+        2023-07-16T13:00:00 <br />
+        <br />
+        Examples:<br />
+        <br />
+        Find the flights allocated to checkin desk 100 from now until 12 hours from now<br />
+        /getResources/APT?from=0&to=12&rt=CheckIn&id=100<br />
+        <br />
+        Find all the resources allocated to flight QF100<br />
+        /getResources/APT?flt=QF100<br />
+        <br />
+        Find all the resources allocated to Emirates (EK)<br />
+        /getResources/APT?al=EK<br />
+        <br />
+        Find all the resources allocated to British Airways (BA) for the next 3 days<br />
+        /getResources/APT?al=BA&from=0&to=72<br />
+        <br />
+        Find all the resources where the custom field name <b>Sh--_GroundHandler</b> of the assigned flight is EAS <br />
+        /getResources/APT?Sh--_GroundHandler=EAS<br />
+
+        </p>
+
+      <b> /getConfiguredResources/[Airport]</b><br />
+        Returns all the configured resources for the specified Airport<br />
+        <br />
+        <span class="main"> Airport</span> - Three letter IATA airport code to the desired airport<br />
+        <br />
+      <b>  /getConfiguredResources/[Airport]/{ResourceType} </b><br />
+        Returns all the configured resources of the specified type for the specified Airport<br />
+        <br/>
+        <span class="main"> Airport</span> - Three letter IATA airport code to the desired airport<br />
+        </p>
+    </div>
+</body>
+
+</html>

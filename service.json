@@ -1,9 +1,12 @@
 {
     "servicename": "aagetflightservice",
     "servicedisplayname": "AAA GetFlight Rest API",
-    "servicedescription": "A  HTTP/JSON  Rest Service for retrieving flights from AMS",
+    "servicedescription": "A  HTTP/JSON  Rest Service for retrieving flights and resource allocations from AMS",
     "serviceipport":"127.0.0.1:8081",
     "scheduleUpdateJob":"02:00:00",
     "scheduleUpdateJobIntervalInHours":24,
-    "debugService": false
+    "debugService": false,
+    "useHTTPS": false,
+    "keyFile":"keyFile",
+    "certFile":"certFile"
 }

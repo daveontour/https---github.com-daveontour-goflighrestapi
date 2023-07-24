@@ -110,11 +110,11 @@ func initRepository(airportCode string) {
 		purgeErr := queue.Purge()
 		if purgeErr != nil {
 			if isDebug {
-				elog.Error(1, "Error purging listening queue")
+				logger.Error("Error purging listening queue")
 			}
 		} else {
 			if isDebug {
-				elog.Info(1, "Listening queue purged OK")
+				logger.Info("Listening queue purged OK")
 			}
 		}
 	}
@@ -127,10 +127,10 @@ func initRepository(airportCode string) {
 
 func populateResourceMaps(airportCode string) {
 
-	elog.Info(1, "Populating Resource Maps")
+	logger.Info("Populating Resource Maps")
 	// Retrieve the available resources
 
-	elog.Info(1, "Populating Checkin Map")
+	logger.Info("Populating Checkin Map")
 	var checkIns FixedResources
 	xml.Unmarshal(getResource(airportCode, "CheckIns"), &checkIns)
 	addResourcesToMap(checkIns.Values, GetRepo(airportCode).CheckInAllocationMap)
@@ -196,8 +196,8 @@ func maintainRepository(airportCode string) {
 	}
 }
 func scheduleUpdates(airportCode string) {
-	// Schedule the regular refresh
 
+	// Schedule the regular refresh
 	loc, _ := time.LoadLocation("Local")
 	today := time.Now().Format("2006-01-02")
 	startTimeStr := today + "T" + serviceConfig.ScheduleUpdateJob
@@ -205,10 +205,18 @@ func scheduleUpdates(airportCode string) {
 
 	s := gocron.NewScheduler(time.Local)
 	s.Every(serviceConfig.ScheduleUpdateJobIntervalInHours).Hours().StartAt(startTime).Do(func() { updateRepository(airportCode) })
-	s.Every(1).Millisecond().LimitRunsTo(1).Do(func() { updateRepository(airportCode) })
-	fmt.Println("Scheduled")
+	s.Every(1).Millisecond().LimitRunsTo(1).Do(func() { loadRepositoryOnStartup(airportCode) })
+	logger.Info(fmt.Sprintf("Regular updates of the repository have been scheduled at %s for every %v hours", startTimeStr, serviceConfig.ScheduleUpdateJobIntervalInHours))
 	s.StartBlocking()
 }
+func loadRepositoryOnStartup(airportCode string) {
+
+	updateRepository(airportCode)
+
+	// Schedule the automated scheduled pushes to for defined endpoints
+	go schedulePushes(airportCode)
+}
+
 func updateRepository(airportCode string) {
 
 	repo := GetRepo(airportCode)
@@ -217,9 +225,7 @@ func updateRepository(airportCode string) {
 		chunkSize = 2
 	}
 
-	if isDebug {
-		elog.Info(1, fmt.Sprintf("Scheduled Maintenance of Repository: %s, Flight Chnk Size: %v ", airportCode, chunkSize))
-	}
+	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s, Flight Chnk Size: %v ", airportCode, chunkSize))
 
 	repoMutex.Lock()
 	defer repoMutex.Unlock()
@@ -244,16 +250,15 @@ func updateRepository(airportCode string) {
 	GetRepo(airportCode).updateLowerLimit(time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location()))
 	GetRepo(airportCode).updateUpperLimit(time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, to.Location()))
 
-	if isDebug {
-		fmt.Println("Repository updated for ", airportCode, "  Number of flights = ", len(GetRepo(airportCode).Flights))
-	}
+	logger.Info(fmt.Sprintf("Repository updated for %s  Number of flights = %v", airportCode, len(GetRepo(airportCode).Flights)))
+
 	cleanRepository(from, airportCode)
 }
 func cleanRepository(from time.Time, airportCode string) {
 
 	// Cleans the repository of old entries
 
-	fmt.Println("Cleaning repository from ", from)
+	logger.Info(fmt.Sprintf("Cleaning repository from: %s", from))
 	flights := GetRepo(airportCode).Flights
 	remove := []Flight{}
 
@@ -267,7 +272,7 @@ func cleanRepository(from time.Time, airportCode string) {
 	for _, f := range remove {
 		delete(GetRepo(airportCode).Flights, f.GetFlightID())
 	}
-	fmt.Println("Repository Cleaned for ", airportCode, "  Number of flights = ", len(remove))
+	logger.Info(fmt.Sprintf("Repository Cleaned for %s  Number of flights = %v", airportCode, len(remove)))
 }
 func updateFlightEntry(message string, airportCode string) {
 
@@ -360,14 +365,14 @@ func getFlights(airportCode string, values ...int) []byte {
 		to = time.Now().AddDate(0, 0, values[1]+1).Format("2006-01-02")
 	}
 
-	fmt.Println("Getting flight from", from, "to", to)
+	logger.Info(fmt.Sprintf("Getting flight from %s to %s", from, to))
 
 	queryBody := fmt.Sprintf(xmlBody, repo.Token, from, to, repo.Airport)
 	bodyReader := bytes.NewReader([]byte(queryBody))
 
 	req, err := http.NewRequest(http.MethodPost, repo.URL, bodyReader)
 	if err != nil {
-		fmt.Printf("client: could not create request: %s\n", err)
+		logger.Error(fmt.Sprintf("client: could not create request: %s\n", err))
 		os.Exit(1)
 	}
 
@@ -376,13 +381,13 @@ func getFlights(airportCode string, values ...int) []byte {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Printf("client: error making http request: %s\n", err)
+		logger.Error(fmt.Sprintf("client: error making http request: %s\n", err))
 		os.Exit(1)
 	}
 
 	resBody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		fmt.Printf("client: could not read response body: %s\n", err)
+		logger.Error(fmt.Sprintf("client: could not read response body: %s\n", err))
 		os.Exit(1)
 	}
 
@@ -518,7 +523,7 @@ func getResource(airportCode string, resourceType string) []byte {
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		fmt.Printf("client: could not create request: %s\n", err)
+		logger.Error(fmt.Sprintf("client: could not create request: %s\n", err))
 		os.Exit(1)
 	}
 
@@ -526,13 +531,13 @@ func getResource(airportCode string, resourceType string) []byte {
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		fmt.Printf("client: error making http request: %s\n", err)
+		logger.Error(fmt.Sprintf("client: error making http request: %s\n", err))
 		os.Exit(1)
 	}
 
 	resBody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		fmt.Printf("client: could not read response body: %s\n", err)
+		logger.Error(fmt.Sprintf("client: could not read response body: %s\n", err))
 		os.Exit(1)
 	}
 

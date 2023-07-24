@@ -15,12 +15,11 @@ import (
 
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
-
 	// "github.com/sirupsen/logrus"
-	"golang.org/x/sys/windows/svc/eventlog"
+	//"golang.org/x/sys/windows/svc/eventlog"
 )
 
-var elog debug.Log
+// var logger debug.Log
 var serviceRunning = false
 
 type exampleService struct{}
@@ -52,7 +51,7 @@ loop:
 				// golang.org/x/sys/windows/svc.TestExample is verifying this output.
 				testOutput := strings.Join(args, "-")
 				testOutput += fmt.Sprintf("-%d", c.Context)
-				elog.Info(1, testOutput)
+				logger.Debug(testOutput)
 
 				//Stop the Servers
 				wg.Done()
@@ -63,7 +62,7 @@ loop:
 			case svc.Continue:
 				changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 			default:
-				elog.Error(1, fmt.Sprintf("unexpected control request #%d", c))
+				logger.Error(fmt.Sprintf("unexpected control request #%d", c))
 			}
 		}
 	}
@@ -73,36 +72,35 @@ loop:
 
 func runService(name string, isDebug bool) {
 	var err error
-	if isDebug {
-		elog = debug.New(name)
-	} else {
-		elog, err = eventlog.Open(name)
-		if err != nil {
-			return
-		}
-	}
-	defer elog.Close()
+	// if isDebug {
+	// 	logger = debug.New(name)
+	// } else {
+	// 	logger, err = eventlog.Open(name)
+	// 	if err != nil {
+	// 		return
+	// 	}
+	// }
+	// defer logger.Close()
 
-	elog.Info(1, fmt.Sprintf("starting %s service", name))
+	logger.Info(fmt.Sprintf("starting %s service", name))
 	run := svc.Run
 	if isDebug {
 		run = debug.Run
 	}
 	err = run(name, &exampleService{})
 	if err != nil {
-		elog.Error(1, fmt.Sprintf("%s service failed: %v", name, err))
+		logger.Info(fmt.Sprintf("%s service failed: %v", name, err))
 		return
 	}
-	elog.Info(1, fmt.Sprintf("%s service stopped", name))
+	logger.Info(fmt.Sprintf("%s service stopped", name))
 }
 
 func runProgram() {
 
 	numCPU := runtime.NumCPU()
 
-	if isDebug {
-		elog.Info(1, fmt.Sprintf("Number of cores available = %v", numCPU))
-	}
+	logger.Debug(fmt.Sprintf("Number of cores available = %v", numCPU))
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	wg.Add(1)
 	go startGinServer()
@@ -116,21 +114,24 @@ func eventMonitor() {
 	for {
 		select {
 		case flight := <-flightUpdatedChannel:
-			if isDebug {
-				elog.Info(59, fmt.Sprintf("FlightUpdated: %s", flight.GetFlightID()))
-			}
+
+			logger.Trace(fmt.Sprintf("FlightUpdated: %s", flight.GetFlightID()))
+			go handleFlightUpdate(flight)
+
 		case flight := <-flightDeletedChannel:
-			if isDebug {
-				elog.Info(59, fmt.Sprintf("FlightDeleted: %s", flight.GetFlightID()))
-			}
+
+			logger.Trace(fmt.Sprintf("FlightDeleted: %s", flight.GetFlightID()))
+			go handleFlightDelete(flight)
+
 		case flight := <-flightCreatedChannel:
-			if isDebug {
-				elog.Info(59, fmt.Sprintf("FlightCreated: %s", flight.GetFlightID()))
-			}
+
+			logger.Trace(fmt.Sprintf("FlightCreated: %s", flight.GetFlightID()))
+			go handleFlightCreate(flight)
+
 		case numflight := <-flightsInitChannel:
-			if isDebug {
-				elog.Info(59, fmt.Sprintf("Flight Initialised or Refreshed: %v", numflight))
-			}
+
+			logger.Trace(fmt.Sprintf("Flight Initialised or Refreshed: %v", numflight))
+
 		}
 	}
 }

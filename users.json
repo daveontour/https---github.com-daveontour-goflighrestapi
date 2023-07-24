@@ -7,13 +7,52 @@
             "allowedairlines":["WY","QF","*"],
             "allowedcustomfields":["FlightUniqueID","Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax","S---_Terminal"],
             "defaultairport":"AUH",
-            "queryablecustomfields": ["Il--_DisembarkingFirstPad","Sh--_GroundHandler"]
+            "queryablecustomfields": ["Il--_DisembarkingFirstPad","Sh--_GroundHandler"],
+            "pushsubscriptions": [
+                {
+                    "Enabled":true,
+                    "PushOnStartUp": true,
+                    "Airport":"AUH",
+                    "DestinationURL":"http://localhost:8081/test",
+                    "HeaderParameters":"",
+                    "SubscriptionType":"Flight",
+                    "Time ":"14:00:00",
+                    "ReptitionHours ":1,
+                    "ReptitionMinutes":1,
+                    "Airline ":"",
+                    "From":0,
+                    "To":24,
+                    "QueryableCustomFields":[],
+                    "ResourceType":"",
+                    "ResourceID":"",
+                    "Route":"",
+                    "Direction":""
+                },                {
+                    "Enabled":true,
+                    "PushOnStartUp": true,
+                    "Airport":"AUH",
+                    "DestinationURL":"http://localhost:8081/test",
+                    "HeaderParameters":"",
+                    "SubscriptionType":"Resource",
+                    "Time ":"14:00:00",
+                    "ReptitionHours ":1,
+                    "ReptitionMinutes":1,
+                    "Airline ":"",
+                    "From":0,
+                    "To":24,
+                    "QueryableCustomFields":[],
+                    "ResourceType":"Stand",
+                    "ResourceID":"",
+                    "Route":"",
+                    "Direction":""
+                }
+            ]
         },
         {
             "username":"AUH",
             "key":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
             "allowedairports":["AUH"],
-            "allowedairlines": [],
+            "allowedairlines": ["*"],
             "allowedcustomfields": [],
             "queryablecustomfields": [],
             "defaultqueryablecustomfields": [
@@ -25,8 +64,6 @@
             ],
             "defaultairline": "QF",
             "overrideairline": "QF"                      
-
-
         } 
     ]
 }

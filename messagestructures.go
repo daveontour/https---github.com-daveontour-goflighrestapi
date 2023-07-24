@@ -102,21 +102,45 @@ type ServiceConfig struct {
 	ScheduleUpdateJob                string `json:"scheduleUpdateJob"`
 	ScheduleUpdateJobIntervalInHours int    `json:"scheduleUpdateJobIntervalInHours"`
 	DebugService                     bool   `json:"debugService"`
+	UseHTTPS                         bool   `json:"useHTTPS"`
+	KeyFile                          string `json:"keyFile"`
+	CertFile                         string `json:"certFile"`
 }
 
 type UserProfile struct {
-	UserName                      string               `json:"username"`
-	Key                           string               `json:"key"`
-	AllowedAirports               []string             `json:"allowedairports"`
-	AllowedAirlines               []string             `json:"allowedairlines"`
-	AllowedCustomFields           []string             `json:"allowedcustomfields"`
-	QueryableCustomFields         []string             `json:"queryablecustomfields"`
-	DefaultAirport                string               `json:"defaultairport"`
-	OverrideAirport               string               `json:"overrideairport"`
-	DefaultAirline                string               `json:"defaultairline"`
-	OverrideAirline               string               `json:"overrideairline"`
-	DefaultQueryableCustomFields  []ParameterValuePair `json:"defaultqueryablecustomfields"`
-	OverrideQueryableCustomFields []ParameterValuePair `json:"overridequeryablecustomfields"`
+	UserName                      string                 `json:"username"`
+	Key                           string                 `json:"key"`
+	AllowedAirports               []string               `json:"allowedairports"`
+	AllowedAirlines               []string               `json:"allowedairlines"`
+	AllowedCustomFields           []string               `json:"allowedcustomfields"`
+	QueryableCustomFields         []string               `json:"queryablecustomfields"`
+	DefaultAirport                string                 `json:"defaultairport"`
+	OverrideAirport               string                 `json:"overrideairport"`
+	DefaultAirline                string                 `json:"defaultairline"`
+	OverrideAirline               string                 `json:"overrideairline"`
+	DefaultQueryableCustomFields  []ParameterValuePair   `json:"defaultqueryablecustomfields"`
+	OverrideQueryableCustomFields []ParameterValuePair   `json:"overridequeryablecustomfields"`
+	UserPushSubscriptions         []UserPushSubscription `json:"pushsubscriptions"`
+}
+
+type UserPushSubscription struct {
+	Enabled               bool
+	PushOnStartUp         bool
+	Airport               string
+	DestinationURL        string
+	HeaderParameters      []ParameterValuePair
+	SubscriptionType      string
+	Time                  string
+	ReptitionHours        int
+	ReptitionMinutes      int
+	Airline               string
+	From                  int
+	To                    int
+	QueryableCustomFields []ParameterValuePair
+	ResourceType          string
+	ResourceID            string
+	Route                 string
+	Direction             string
 }
 
 type Users struct {
@@ -156,8 +180,11 @@ type Repositories struct {
 type Response struct {
 	User             string               `json:"User,omitempty"`
 	AirportCode      string               `json:"AirportCode,omitempty"`
+	Route            string               `json:"Route,omitempty"`
 	From             string               `json:"FlightsFrom,omitempty"`
 	To               string               `json:"FlightsTo,omitempty"`
+	FromResource     string               `json:"ResourcessFrom,omitempty"`
+	ToResource       string               `json:"ResourceTo,omitempty"`
 	NumberOfFlights  int                  `json:"NumberOfFlights,omitempty"`
 	Direction        string               `json:"Direction,omitempty"`
 	CustomFieldQuery []ParameterValuePair `json:"CustomFieldQueries,omitempty"`
@@ -172,12 +199,17 @@ type ResourceResponse struct {
 	From                string                           `json:"FlightsFrom,omitempty"`
 	To                  string                           `json:"FlightsTo,omitempty"`
 	NumberOfFlights     int                              `json:"NumberOfFlights,omitempty"`
+	FromResource        string                           `json:"ResourcessFrom,omitempty"`
+	ToResource          string                           `json:"ResourceTo,omitempty"`
 	Direction           string                           `json:"Direction,omitempty"`
 	CustomFieldQuery    []ParameterValuePair             `json:"CustomFieldQueries,omitempty"`
 	Warnings            []string                         `json:"Warnings,omitempty"`
 	Errors              []string                         `json:"Errors,omitempty"`
-	Allocations         []AllocationResponseItem         `json:"Allocations,omitempty"`
 	ResourceType        string                           `json:"ResourceType,omitempty"`
+	ResourceID          string                           `json:"ResourceID,omitempty"`
+	FlightID            string                           `json:"FlightID,omitempty"`
+	Airline             string                           `json:"Airline,omitempty"`
+	Allocations         []AllocationResponseItem         `json:"Allocations,omitempty"`
 	ConfiguredResources []ConfiguredResourceResponseItem `json:"ConfiguredResources,omitempty"`
 }
 
@@ -194,6 +226,7 @@ type Request struct {
 	From                       string
 	To                         string
 	UpdatedSince               string
+	Route                      string
 	UserProfile                UserProfile
 	PresentQueryableParameters []ParameterValuePair
 }
@@ -403,64 +436,3 @@ type ChuteSlot struct {
 type ChuteSlots struct {
 	ChuteSlot []ChuteSlot `xml:"ChuteSlot" json:"ChuteSlot,omitempty"`
 }
-
-// func (list *FlightList) insert(flight Flight) {
-
-// 	newNode := &FlightLinkItem{
-// 		Flight:   flight,
-// 		FlightID: flight.GetFlightID(),
-// 		Previous: nil,
-// 		Next:     nil,
-// 	}
-
-// 	startdata := flight.GetSTO()
-
-// 	if list.head == nil {
-// 		list.head = newNode
-// 		list.tail = newNode
-// 	} else if startdata.Before(list.head.Flight.GetSTO()) || startdata == list.head.Flight.GetSTO() {
-// 		newNode.Next = list.head
-// 		list.head.Previous = newNode
-// 		list.head = newNode
-// 	} else if startdata.After(list.tail.Flight.GetSTO()) {
-// 		newNode.Previous = list.tail
-// 		list.tail.Next = newNode
-// 		list.tail = newNode
-// 	} else {
-// 		currentNode := list.head.Next
-// 		for currentNode != nil {
-// 			if startdata.Before(currentNode.Flight.GetSTO()) || startdata == currentNode.Flight.GetSTO() {
-// 				newNode.Previous = currentNode.Previous
-// 				newNode.Next = currentNode
-// 				currentNode.Previous.Next = newNode
-// 				currentNode.Previous = newNode
-// 				break
-// 			}
-// 			currentNode = currentNode.Next
-// 		}
-// 	}
-// }
-
-// func (list *FlightList) remove(flightId string) {
-// 	currentNode := list.head
-// 	for currentNode != nil {
-// 		if currentNode.FlightID == flightId {
-// 			if currentNode == list.head {
-// 				list.head = currentNode.Next
-// 				if list.head != nil {
-// 					list.head.Previous = nil
-// 				} else {
-// 					list.tail = nil
-// 				}
-// 			} else if currentNode == list.tail {
-// 				list.tail = currentNode.Previous
-// 				list.tail.Next = nil
-// 			} else {
-// 				currentNode.Previous.Next = currentNode.Next
-// 				currentNode.Next.Previous = currentNode.Previous
-// 			}
-// 			break
-// 		}
-// 		currentNode = currentNode.Next
-// 	}
-// }
