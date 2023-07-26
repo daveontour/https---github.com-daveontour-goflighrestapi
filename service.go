@@ -106,6 +106,11 @@ func runProgram() {
 	go startGinServer()
 	go eventMonitor()
 	go InitRepositories()
+
+	// Initiate the User Change Subscriptions
+	for _, up := range getUserProfiles() {
+		userChangeSubscriptions = append(userChangeSubscriptions, up.UserChangeSubscriptions...)
+	}
 	wg.Wait()
 }
 

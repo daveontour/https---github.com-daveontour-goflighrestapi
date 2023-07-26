@@ -497,11 +497,211 @@ type Change struct {
 	NewValue     string `xml:"NewValue"`
 }
 
+type GateSlotsChange struct {
+	OldValue struct {
+		GateSlot struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"GateSlot"`
+	} `xml:"OldValue"`
+	NewValue struct {
+		GateSlot struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"GateSlot"`
+	} `xml:"NewValue"`
+}
+type StandSlotChange struct {
+	OldValue struct {
+		SdandSlot struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"StandSlot"`
+	} `xml:"OldValue"`
+	NewValue struct {
+		StandSlot struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"StandSlot"`
+	} `xml:"NewValue"`
+}
+type CheckInSlotsChange struct {
+	OldValue struct {
+		CheckInSlot []struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+			CheckIn struct {
+				Value []struct {
+					Text         string `xml:",chardata"`
+					PropertyName string `xml:"propertyName,attr"`
+				} `xml:"Value"`
+				Area struct {
+					Value struct {
+						Text         string `xml:",chardata"`
+						PropertyName string `xml:"propertyName,attr"`
+					} `xml:"Value"`
+				} `xml:"Area"`
+			} `xml:"CheckIn"`
+		} `xml:"CheckInSlot"`
+	} `xml:"OldValue"`
+	NewValue struct {
+		CheckInSlot []struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+			CheckIn struct {
+				Value []struct {
+					Text         string `xml:",chardata"`
+					PropertyName string `xml:"propertyName,attr"`
+				} `xml:"Value"`
+				Area struct {
+					Value struct {
+						Text         string `xml:",chardata"`
+						PropertyName string `xml:"propertyName,attr"`
+					} `xml:"Value"`
+				} `xml:"Area"`
+			} `xml:"CheckIn"`
+		} `xml:"CheckInSlot"`
+	} `xml:"NewValue"`
+}
+type CarouselSlotsChange struct {
+	OldValue struct {
+		CarouselSlot struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"CarouselSlot"`
+	} `xml:"OldValue"`
+	NewValue struct {
+		CarouselSlot struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+			Carousel struct {
+				Value []struct {
+					Text         string `xml:",chardata"`
+					PropertyName string `xml:"propertyName,attr"`
+				} `xml:"Value"`
+				Area struct {
+					Value struct {
+						Text         string `xml:",chardata"`
+						PropertyName string `xml:"propertyName,attr"`
+					} `xml:"Value"`
+				} `xml:"Area"`
+			} `xml:"Carousel"`
+		} `xml:"CarouselSlot"`
+	} `xml:"NewValue"`
+}
+
+type ChuteSlotsChange struct {
+	OldValue struct {
+		ChuteSlot struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"ChuteSlot"`
+	} `xml:"OldValue"`
+	NewValue struct {
+		ChuteSlot struct {
+			Value []struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+			Chute struct {
+				Value []struct {
+					Text         string `xml:",chardata"`
+					PropertyName string `xml:"propertyName,attr"`
+				} `xml:"Value"`
+				Area struct {
+					Value struct {
+						Text         string `xml:",chardata"`
+						PropertyName string `xml:"propertyName,attr"`
+					} `xml:"Value"`
+				} `xml:"Area"`
+			} `xml:"Chute"`
+		} `xml:"ChuteSlot"`
+	} `xml:"NewValue"`
+}
+type AircraftTypeChange struct {
+	OldValue struct {
+		AircraftType struct {
+			AircraftTypeId struct {
+				AircraftTypeCode []struct {
+					Text        string `xml:",chardata"`
+					CodeContext string `xml:"codeContext,attr"`
+				} `xml:"AircraftTypeCode"`
+			} `xml:"AircraftTypeId"`
+			Value struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"AircraftType"`
+	} `xml:"OldValue"`
+	NewValue struct {
+		AircraftType struct {
+			AircraftTypeId struct {
+				AircraftTypeCode []struct {
+					Text        string `xml:",chardata"`
+					CodeContext string `xml:"codeContext,attr"`
+				} `xml:"AircraftTypeCode"`
+			} `xml:"AircraftTypeId"`
+			Value struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"AircraftType"`
+	} `xml:"NewValue"`
+}
+
+type AircraftChange struct {
+	OLdValue struct {
+		Aircraft struct {
+			AircraftId struct {
+				Registration string `xml:"Registration"`
+			} `xml:"AircraftId"`
+			Value struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"Aircraft"`
+	} `xml:"OldValue"`
+	NewValue struct {
+		Aircraft struct {
+			AircraftId struct {
+				Registration string `xml:"Registration"`
+			} `xml:"AircraftId"`
+			Value struct {
+				Text         string `xml:",chardata"`
+				PropertyName string `xml:"propertyName,attr"`
+			} `xml:"Value"`
+		} `xml:"Aircraft"`
+	} `xml:"NewValue"`
+}
+
 type FlightChanges struct {
-	AircraftTypeChange interface{} `xml:"AircraftTypeChange" json:"AircraftTypeChange"`
-	// CarouselSlotsChange interface {} `xml:CarouselSlotsChange" json:"CarouselSlotsChange"`
-	// GatelSlotsChange interface {} `xml:GateSlotsChange" json:"GateSlotsChange"`
-	Changes []Change `xml:"Change"`
+	Text                string               `xml:",innerxml" json:"changetext"`
+	AircraftTypeChange  *AircraftTypeChange  `xml:"AircraftTypeChange" json:"AircraftTypeChange"`
+	AircraftChange      *AircraftChange      `xml:"AircraftChange" json:"AircraftChange"`
+	CarouselSlotsChange *CarouselSlotsChange `xml:"CarouselSlotsChange" json:"CarouselSlotsChange"`
+	GateSlotsChange     *GateSlotsChange     `xml:"GateSlotsChange" json:"GateSlotsChange"`
+	StandSlotsChange    *StandSlotChange     `xml:"StandSlotsChange" json:"StandSlotsChange"`
+	ChuteSlotsChange    *ChuteSlotsChange    `xml:"ChuteSlotsChange" json:"ChuteSlotsChange"`
+	CheckinSlotsChange  *CheckInSlotsChange  `xml:"CheckInSlotsChange" json:"CheckInSlotsChange"`
+	Changes             []Change             `xml:"Change"`
 }
 
 type Flight struct {
@@ -636,6 +836,16 @@ func (f Flight) GetIATAAirline() string {
 	}
 	return ""
 }
+
+func (f Flight) GetIATAAirport() string {
+	for _, v := range f.FlightId.AirportCode {
+		if v.CodeContext == "IATA" {
+			return v.Text
+		}
+	}
+	return ""
+}
+
 func (f Flight) GetICAOAirline() string {
 	for _, v := range f.FlightId.AirlineDesignator {
 		if v.CodeContext == "ICAO" {

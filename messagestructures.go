@@ -108,19 +108,20 @@ type ServiceConfig struct {
 }
 
 type UserProfile struct {
-	UserName                      string                 `json:"username"`
-	Key                           string                 `json:"key"`
-	AllowedAirports               []string               `json:"allowedairports"`
-	AllowedAirlines               []string               `json:"allowedairlines"`
-	AllowedCustomFields           []string               `json:"allowedcustomfields"`
-	QueryableCustomFields         []string               `json:"queryablecustomfields"`
-	DefaultAirport                string                 `json:"defaultairport"`
-	OverrideAirport               string                 `json:"overrideairport"`
-	DefaultAirline                string                 `json:"defaultairline"`
-	OverrideAirline               string                 `json:"overrideairline"`
-	DefaultQueryableCustomFields  []ParameterValuePair   `json:"defaultqueryablecustomfields"`
-	OverrideQueryableCustomFields []ParameterValuePair   `json:"overridequeryablecustomfields"`
-	UserPushSubscriptions         []UserPushSubscription `json:"pushsubscriptions"`
+	UserName                      string                   `json:"username"`
+	Key                           string                   `json:"key"`
+	AllowedAirports               []string                 `json:"allowedairports"`
+	AllowedAirlines               []string                 `json:"allowedairlines"`
+	AllowedCustomFields           []string                 `json:"allowedcustomfields"`
+	QueryableCustomFields         []string                 `json:"queryablecustomfields"`
+	DefaultAirport                string                   `json:"defaultairport"`
+	OverrideAirport               string                   `json:"overrideairport"`
+	DefaultAirline                string                   `json:"defaultairline"`
+	OverrideAirline               string                   `json:"overrideairline"`
+	DefaultQueryableCustomFields  []ParameterValuePair     `json:"defaultqueryablecustomfields"`
+	OverrideQueryableCustomFields []ParameterValuePair     `json:"overridequeryablecustomfields"`
+	UserPushSubscriptions         []UserPushSubscription   `json:"pushsubscriptions"`
+	UserChangeSubscriptions       []UserChangeSubscription `json:"changesubscriptions"`
 }
 
 type UserPushSubscription struct {
@@ -141,6 +142,21 @@ type UserPushSubscription struct {
 	ResourceID            string
 	Route                 string
 	Direction             string
+}
+
+type UserChangeSubscription struct {
+	Enabled                  bool
+	Airport                  string
+	DestinationURL           string
+	HeaderParameters         []ParameterValuePair
+	CheckInChange            bool
+	GateChange               bool
+	StandChange              bool
+	CarouselChange           bool
+	ChuteChange              bool
+	AircraftTypeOrRegoChange bool
+	EventChange              bool
+	ParameterChange          []string
 }
 
 type Users struct {

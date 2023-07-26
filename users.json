@@ -8,9 +8,26 @@
             "allowedcustomfields":["FlightUniqueID","Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax","S---_Terminal"],
             "defaultairport":"AUH",
             "queryablecustomfields": ["Il--_DisembarkingFirstPad","Sh--_GroundHandler"],
-            "pushsubscriptions": [
+            "changesubscriptions":[
                 {
                     "Enabled":true,
+                    "Airport":"AUH",
+                    "DestinationURL":"http://localhost:8081/test",
+                    "HeaderParameters":"",
+                    "CheckInChange":true,
+                    "GateChange":true,
+                    "StandChange":true,
+                    "CarouselChange":true,
+                    "ChuteChange":true,
+                    "AircraftTypeOrRegoChange":true,
+                    "EventChange":true,
+                    "CustomFieldChange":["Stand"]
+
+                }
+            ],
+            "pushsubscriptions": [
+                {
+                    "Enabled":false,
                     "PushOnStartUp": true,
                     "Airport":"AUH",
                     "DestinationURL":"http://localhost:8081/test",
@@ -28,7 +45,7 @@
                     "Route":"",
                     "Direction":""
                 },                {
-                    "Enabled":true,
+                    "Enabled":false,
                     "PushOnStartUp": true,
                     "Airport":"AUH",
                     "DestinationURL":"http://localhost:8081/test",

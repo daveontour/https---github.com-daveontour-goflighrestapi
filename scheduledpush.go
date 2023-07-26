@@ -88,7 +88,6 @@ func executePush(sub UserPushSubscription, userToken, userName string) {
 	req, err := http.NewRequest(http.MethodPost, sub.DestinationURL, bodyReader)
 	if err != nil {
 		logger.Error(fmt.Sprintf("client: could not create request: %s\n", err))
-		os.Exit(1)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
