@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 func contains(elems []string, v string) bool {
@@ -15,7 +16,17 @@ func contains(elems []string, v string) bool {
 	}
 	return false
 }
+func CleanJSON(sb strings.Builder) string {
 
+	s := sb.String()
+	if last := len(s) - 1; last >= 0 && s[last] == ',' {
+		s = s[:last]
+	}
+
+	s = s + "}"
+
+	return s
+}
 func readBytesFromFile(filename string) (byteResult []byte) {
 	ex, err := os.Executable()
 	if err != nil {
@@ -64,4 +75,16 @@ func getUserProfiles() []UserProfile {
 	json.Unmarshal([]byte(readBytesFromFile("users.json")), &users)
 
 	return users.Users
+}
+func Max(x, y int) int {
+	if x < y {
+		return y
+	}
+	return x
+}
+func Min(x, y int) int {
+	if x < y {
+		return x
+	}
+	return y
 }

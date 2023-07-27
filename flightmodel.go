@@ -20,7 +20,6 @@ type AirportCode struct {
 }
 
 type FlightId struct {
-	XMLName           xml.Name            `xml:"FlightId" json:"-"`
 	FlightKind        string              `xml:"FlightKind"`
 	AirlineDesignator []AirlineDesignator `xml:"AirlineDesignator"`
 	FlightNumber      string              `xml:"FlightNumber"`
@@ -28,17 +27,6 @@ type FlightId struct {
 	AirportCode       []AirportCode       `xml:"AirportCode"`
 }
 
-func CleanJSON(sb strings.Builder) string {
-
-	s := sb.String()
-	if last := len(s) - 1; last >= 0 && s[last] == ',' {
-		s = s[:last]
-	}
-
-	s = s + "}"
-
-	return s
-}
 func (d FlightId) MarshalJSON() ([]byte, error) {
 
 	var sb strings.Builder
@@ -80,7 +68,6 @@ func (d FlightId) MarshalJSON() ([]byte, error) {
 	sb.WriteString("}")
 
 	return []byte(sb.String()), nil
-
 }
 
 type Value struct {
@@ -91,7 +78,6 @@ type Value struct {
 func (d Value) MarshalJSON() ([]byte, error) {
 	v := fmt.Sprintf("{\"%s\":\"%s\"}", d.PropertyName, d.Text)
 	return []byte(v), nil
-
 }
 
 type LinkedFlight struct {
@@ -117,7 +103,6 @@ func (d LinkedFlight) MarshalJSON() ([]byte, error) {
 	s := CleanJSON(sb)
 
 	return []byte(s), nil
-
 }
 
 type AircraftTypeCode struct {
@@ -147,11 +132,9 @@ func (tid AircraftTypeId) MarshalJSON() ([]byte, error) {
 	s = s + "}"
 
 	return []byte(s), nil
-
 }
 
 type AircraftType struct {
-	//Text           string         `xml:",chardata" json:"-"`
 	AircraftTypeId AircraftTypeId `xml:"AircraftTypeId"`
 	Value          []Value        `xml:"Value"`
 }
@@ -170,7 +153,6 @@ func (t AircraftType) MarshalJSON() ([]byte, error) {
 	s := CleanJSON(sb)
 
 	return []byte(s), nil
-
 }
 
 type RouteViaPoint struct {
@@ -214,13 +196,11 @@ func (r ViaPoints) MarshalJSON() ([]byte, error) {
 }
 
 type Route struct {
-	//	Text        string    `xml:",chardata" json:"-"`
 	CustomsType string    `xml:"customsType,attr"`
 	ViaPoints   ViaPoints `xml:"ViaPoints"`
 }
 
 type TableValue struct {
-	//Text         string  `xml:",chardata" json:"-"`
 	PropertyName string  `xml:"propertyName,attr"`
 	Value        []Value `xml:"Value"`
 }
@@ -258,7 +238,6 @@ func (ss StandSlots) MarshalJSON() ([]byte, error) {
 	sb.WriteString("]")
 
 	return []byte(sb.String()), nil
-
 }
 
 func (ss CarouselSlots) MarshalJSON() ([]byte, error) {
@@ -294,7 +273,6 @@ func (ss CarouselSlots) MarshalJSON() ([]byte, error) {
 	sb.WriteString("]")
 
 	return []byte(sb.String()), nil
-
 }
 
 func (ss GateSlots) MarshalJSON() ([]byte, error) {
@@ -331,7 +309,6 @@ func (ss GateSlots) MarshalJSON() ([]byte, error) {
 	sb.WriteString("]")
 
 	return []byte(sb.String()), nil
-
 }
 
 func (ss CheckInSlots) MarshalJSON() ([]byte, error) {
@@ -365,7 +342,6 @@ func (ss CheckInSlots) MarshalJSON() ([]byte, error) {
 	sb.WriteString("]")
 
 	return []byte(sb.String()), nil
-
 }
 
 func (ss ChuteSlots) MarshalJSON() ([]byte, error) {
@@ -400,7 +376,6 @@ func (ss ChuteSlots) MarshalJSON() ([]byte, error) {
 	sb.WriteString("]")
 
 	return []byte(sb.String()), nil
-
 }
 
 type AircraftId struct {
@@ -411,7 +386,6 @@ type Aircraft struct {
 }
 
 type FlightState struct {
-	XMLName       xml.Name      `xml:"FlightState" json:"-"`
 	ScheduledTime string        `xml:"ScheduledTime" `
 	LinkedFlight  LinkedFlight  `xml:"LinkedFlight"`
 	AircraftType  AircraftType  `xml:"AircraftType"`
@@ -446,7 +420,6 @@ func MarshalJSON(vs []Value) []byte {
 	s = s + "}"
 
 	return []byte(s)
-
 }
 func (d FlightState) MarshalJSON() ([]byte, error) {
 
@@ -566,7 +539,6 @@ type CarouselSlotsChange struct {
 		} `xml:"CarouselSlot"`
 	} `xml:"NewValue"`
 }
-
 type ChuteSlotsChange struct {
 	OldValue struct {
 		ChuteSlot struct {
@@ -612,7 +584,6 @@ type AircraftTypeChange struct {
 		} `xml:"AircraftType"`
 	} `xml:"NewValue"`
 }
-
 type AircraftChange struct {
 	OLdValue struct {
 		Aircraft struct {
@@ -631,9 +602,7 @@ type AircraftChange struct {
 		} `xml:"Aircraft"`
 	} `xml:"NewValue"`
 }
-
 type FlightChanges struct {
-	Text                string               `xml:",innerxml" json:"changetext"`
 	AircraftTypeChange  *AircraftTypeChange  `xml:"AircraftTypeChange" json:"AircraftTypeChange"`
 	AircraftChange      *AircraftChange      `xml:"AircraftChange" json:"AircraftChange"`
 	CarouselSlotsChange *CarouselSlotsChange `xml:"CarouselSlotsChange" json:"CarouselSlotsChange"`
@@ -643,18 +612,90 @@ type FlightChanges struct {
 	CheckinSlotsChange  *CheckInSlotsChange  `xml:"CheckInSlotsChange" json:"CheckInSlotsChange"`
 	Changes             []Change             `xml:"Change"`
 }
-
 type Flight struct {
-	XMLName       xml.Name      `xml:"Flight" json:"-"`
+	Action        string        `xml:"Action" json:"Action"`
 	FlightId      FlightId      `xml:"FlightId" json:"FlightId"`
 	FlightState   FlightState   `xml:"FlightState" json:"FlightState"`
 	FlightChanges FlightChanges `xml:"FlightChanges" json:"FlightChanges"`
 	LastUpdate    time.Time     `xml:"LastUpdate" json:"LastUpdate"`
-	//Properties    map[string]string `xml:"-" json:"-"`
 }
 type Flights struct {
-	XMLName xml.Name `xml:"Flights" json:"-"`
-	Flight  []Flight `xml:"Flight" json:"Flights"`
+	Flight []Flight `xml:"Flight" json:"Flights"`
+}
+type StandAllocation struct {
+	Stand  Stand
+	From   time.Time
+	To     time.Time
+	Flight FlightId
+}
+
+type StandAllocations struct {
+	Allocations []StandAllocation
+}
+
+// Resource definitions
+
+type Area struct {
+	Value []Value `xml:"Value"`
+}
+
+type Stand struct {
+	Value []Value `xml:"Value" json:"Slot,omitempty"`
+	Area  Area    `xml:"Area" json:"Area,omitempty"`
+}
+
+type StandSlot struct {
+	Value []Value `xml:"Value" json:"Slot,omitempty"`
+	Stand Stand   `xml:"Stand" json:"Area,omitempty"`
+}
+type StandSlots struct {
+	StandSlot []StandSlot `xml:"StandSlot" json:"StandSlot,omitempty"`
+}
+type Carousel struct {
+	Value []Value `xml:"Value" json:"Slot,omitempty"`
+	Area  Area    `xml:"Area" json:"Area,omitempty"`
+}
+type CarouselSlot struct {
+	Value    []Value  `xml:"Value" json:"Slot,omitempty"`
+	Carousel Carousel `xml:"Carousel" json:"Carousel,omitempty"`
+}
+type CarouselSlots struct {
+	CarouselSlot []CarouselSlot `xml:"CarouselSlot" json:"CarouselSlot,omitempty"`
+}
+
+type Gate struct {
+	Value []Value `xml:"Value"`
+	Area  Area    `xml:"Area"`
+}
+
+type GateSlot struct {
+	Value []Value `xml:"Value"`
+	Gate  Gate    `xml:"Gate"`
+}
+type GateSlots struct {
+	GateSlot []GateSlot `xml:"GateSlot" json:"GateSlot,omitempty"`
+}
+type CheckIn struct {
+	Value []Value `xml:"Value"`
+	Area  Area    `xml:"Area"`
+}
+type CheckInSlot struct {
+	Value   []Value `xml:"Value"`
+	CheckIn CheckIn `xml:"CheckIn"`
+}
+type CheckInSlots struct {
+	CheckInSlot []CheckInSlot `xml:"CheckInSlot" json:"CheckInSlot,omitempty"`
+}
+type Chute struct {
+	Value []Value `xml:"Value"`
+	Area  Area    `xml:"Area"`
+}
+type ChuteSlot struct {
+	Value []Value `xml:"Values"`
+	Chute Chute   `xml:"Chute"`
+}
+type ChuteSlots struct {
+	ChuteSlot []ChuteSlot `xml:"ChuteSlot" json:"ChuteSlot,omitempty"`
 }
 
 func (fs Flights) DuplicateFlights() Flights {
@@ -680,29 +721,12 @@ func (fs Flight) DuplicateFlight() Flight {
 
 type Envelope struct {
 	XMLName xml.Name `xml:"Envelope"`
-	//	Text    string   `xml:",chardata"`
-	//	S       string   `xml:"s,attr"`
-	Body struct {
-		Text               string `xml:",chardata"`
+	Body    struct {
 		GetFlightsResponse struct {
-			//Text             string `xml:",chardata"`
-			//Xmlns            string `xml:"xmlns,attr"`
 			GetFlightsResult struct {
-				//Text             string `xml:",chardata"`
 				WebServiceResult struct {
-					//Text        string `xml:",chardata"`
-					//ApiVersion  string `xml:"apiVersion,attr"`
-					//Xsd         string `xml:"xsd,attr"`
-					//Xsi         string `xml:"xsi,attr"`
 					ApiResponse struct {
-						//Text   string `xml:",chardata"`
-						// Status struct {
-						// 	Text  string `xml:",chardata"`
-						// 	Xmlns string `xml:"xmlns,attr"`
-						// } `xml:"Status"`
 						Data struct {
-							///	Text    string  `xml:",chardata"`
-							//Xmlns   string  `xml:"xmlns,attr"`
 							Flights Flights `xml:"Flights"`
 						} `xml:"Data"`
 					} `xml:"ApiResponse"`
@@ -743,16 +767,6 @@ func (f Flight) GetSDO() time.Time {
 	sdod, _ := time.Parse("2006-01-02", sdo)
 	return sdod
 }
-
-// func (f Flight) InitPropertyMap() {
-
-// 	f.Properties = make(map[string]string)
-
-// 	for _, p := range f.FlightState.Value {
-// 		f.Properties[p.PropertyName] = p.Text
-// 	}
-// }
-
 func (f Flight) GetProperty(property string) string {
 	for _, v := range f.FlightState.Value {
 		if v.PropertyName == property {
@@ -776,7 +790,6 @@ func (f Flight) GetIATAAirline() string {
 	}
 	return ""
 }
-
 func (f Flight) GetIATAAirport() string {
 	for _, v := range f.FlightId.AirportCode {
 		if v.CodeContext == "IATA" {
@@ -785,7 +798,6 @@ func (f Flight) GetIATAAirport() string {
 	}
 	return ""
 }
-
 func (f Flight) GetICAOAirline() string {
 	for _, v := range f.FlightId.AirlineDesignator {
 		if v.CodeContext == "ICAO" {
@@ -794,7 +806,6 @@ func (f Flight) GetICAOAirline() string {
 	}
 	return ""
 }
-
 func (f Flight) GetFlightID() string {
 
 	airline := f.GetIATAAirline()
@@ -813,9 +824,7 @@ func (f Flight) GetFlightDirection() string {
 	} else {
 		return "Departure"
 	}
-
 }
-
 func (f Flight) GetFlightRoute() string {
 
 	var sb strings.Builder
@@ -836,9 +845,7 @@ func (f Flight) GetFlightRoute() string {
 	}
 
 	return sb.String()
-
 }
-
 func (f Flight) GetAircraftType() string {
 
 	sb := "-"
@@ -851,9 +858,7 @@ func (f Flight) GetAircraftType() string {
 	}
 
 	return sb
-
 }
-
 func (f Flight) GetAircraftRegistration() string {
 
 	if f.FlightState.Aircraft.AircraftId.Registration != "" {
@@ -861,12 +866,10 @@ func (f Flight) GetAircraftRegistration() string {
 	} else {
 		return "-"
 	}
-
 }
 func (f Flight) GetSTO() time.Time {
 
 	sto := f.FlightState.ScheduledTime
-	loc, _ := time.LoadLocation("Local")
 
 	if sto != "" {
 		stot, err := time.ParseInLocation("2006-01-02T15:04:05", sto, loc)
@@ -879,15 +882,116 @@ func (f Flight) GetSTO() time.Time {
 	return time.Now()
 }
 
-func Max(x, y int) int {
-	if x < y {
-		return y
+func (p CheckInSlot) getResourceID() (name string, from time.Time, to time.Time) {
+
+	for _, v := range p.Value {
+
+		if v.PropertyName == "StartTime" {
+			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
+		if v.PropertyName == "EndTime" {
+			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
 	}
-	return x
+
+	for _, v := range p.CheckIn.Value {
+		if v.PropertyName == "Name" {
+			name = v.Text
+			continue
+		}
+	}
+	return
 }
-func Min(x, y int) int {
-	if x < y {
-		return x
+
+func (p StandSlot) getResourceID() (name string, from time.Time, to time.Time) {
+
+	for _, v := range p.Value {
+
+		if v.PropertyName == "StartTime" {
+			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
+		if v.PropertyName == "EndTime" {
+			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
 	}
-	return y
+
+	for _, v := range p.Stand.Value {
+		if v.PropertyName == "Name" {
+			name = v.Text
+			continue
+		}
+	}
+	return
+}
+func (p CarouselSlot) getResourceID() (name string, from time.Time, to time.Time) {
+
+	for _, v := range p.Value {
+
+		if v.PropertyName == "StartTime" {
+			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
+		if v.PropertyName == "EndTime" {
+			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
+	}
+
+	for _, v := range p.Carousel.Value {
+		if v.PropertyName == "Name" {
+			name = v.Text
+			continue
+		}
+	}
+	return
+}
+
+func (p ChuteSlot) getResourceID() (name string, from time.Time, to time.Time) {
+
+	for _, v := range p.Value {
+
+		if v.PropertyName == "StartTime" {
+			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
+		if v.PropertyName == "EndTime" {
+			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
+	}
+
+	for _, v := range p.Chute.Value {
+		if v.PropertyName == "Name" {
+			name = v.Text
+			continue
+		}
+	}
+	return
+}
+
+func (p GateSlot) getResourceID() (name string, from time.Time, to time.Time) {
+
+	for _, v := range p.Value {
+
+		if v.PropertyName == "StartTime" {
+			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
+		if v.PropertyName == "EndTime" {
+			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			continue
+		}
+	}
+
+	for _, v := range p.Gate.Value {
+		if v.PropertyName == "Name" {
+			name = v.Text
+			continue
+		}
+	}
+	return name, from, to
 }

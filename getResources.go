@@ -68,8 +68,6 @@ func getResourceAPI(c *gin.Context) {
 
 func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, userToken string, c *gin.Context) (ResourceResponse, GetFlightsError) {
 
-	loc, _ := time.LoadLocation("Local")
-
 	// Create the response object so we can return early if required
 	response := ResourceResponse{}
 	//	c.Writer.Header().Set("Content-Type", "application/json")

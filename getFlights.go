@@ -228,7 +228,6 @@ func normaliseRequest(request Request, response Response, c *gin.Context, qf []P
 func filterFlights(request Request, response Response, flights map[string]Flight, c *gin.Context) (Response, error) {
 
 	returnFlights := []Flight{}
-	loc, _ := time.LoadLocation("Local")
 
 	// var from time.Time
 	// var to time.Time

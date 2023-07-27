@@ -21,8 +21,10 @@
                     "ChuteChange":true,
                     "AircraftTypeOrRegoChange":true,
                     "EventChange":true,
-                    "CustomFieldChange":["Stand"]
-
+                    "CustomFieldChange":["Stand"],
+                    "CreateFlight": true,
+                    "DeleteFlight":true,
+                    "UpdateFlight":false
                 }
             ],
             "pushsubscriptions": [

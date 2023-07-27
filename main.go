@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"flag"
 
@@ -24,10 +25,20 @@ var wg sync.WaitGroup
 
 var repoMutex sync.Mutex
 var mapMutex sync.Mutex
+var changeSubscriptionMutex sync.Mutex
 var serviceConfig ServiceConfig
 var isDebug bool = false
 
 var logger = logrus.New()
+
+const layout = "2006-01-02T15:04:05"
+
+var loc *time.Location
+
+const UpdateAction = "UPDATE"
+const CreateAction = "CREATE"
+const DeleteAction = "DELETE"
+const StatusAction = "STATUS"
 
 var repositoryUpdateChannel = make(chan int)
 var flightUpdatedChannel = make(chan Flight)
@@ -41,6 +52,7 @@ var userChangeSubscriptions []UserChangeSubscription
 
 func main() {
 
+	loc, _ = time.LoadLocation("Local")
 	serviceConfig = getServiceConfig()
 	svcName := serviceConfig.ServiceName
 	isDebug = serviceConfig.DebugService
