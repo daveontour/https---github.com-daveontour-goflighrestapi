@@ -94,6 +94,11 @@ type ParameterValuePair struct {
 	Value     string `json:"Value,omitempty"`
 }
 
+type PropertyValuePair struct {
+	Text         string `xml:",chardata"`
+	PropertyName string `xml:"propertyName,attr"`
+}
+
 type ServiceConfig struct {
 	ServiceName                      string `json:"servicename"`
 	ServicDisplayName                string `json:"servicedisplayname"`

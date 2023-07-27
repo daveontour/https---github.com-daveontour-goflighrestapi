@@ -4,10 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -99,34 +96,4 @@ func executePush(sub UserPushSubscription, userToken, userName string) {
 	if sendErr != nil {
 		logger.Error(fmt.Sprintf("Scheduled Push for user %s: Error making http request: %s\n", userName, sendErr))
 	}
-
-}
-
-func getUserProfiles() []UserProfile {
-
-	//Read read the file for each request so changes can be made without the need to restart the server
-
-	ex, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	exPath := filepath.Dir(ex)
-
-	fileContent, err := os.Open(filepath.Join(exPath, "users.json"))
-
-	if err != nil {
-		logger.Error("Error Reading " + filepath.Join(exPath, "users.json"))
-		logger.Error(err.Error())
-		return []UserProfile{}
-	}
-
-	defer fileContent.Close()
-
-	byteResult, _ := ioutil.ReadAll(fileContent)
-
-	var users Users
-
-	json.Unmarshal([]byte(byteResult), &users)
-
-	return users.Users
 }

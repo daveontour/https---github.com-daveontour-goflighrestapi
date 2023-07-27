@@ -32,6 +32,7 @@ func startGinServer() {
 
 	// Configure all the endpoints for the HTTP Server
 	router.POST("/test", testQuery)
+	router.GET("/reinit/:apt", reinit)
 	router.GET("/getFlights/:apt", getRequestedFlightsAPI)
 	router.GET("/stopJobs/:apt/:userToken", stopJobs)
 	router.GET("/stopAllAptJobs/:apt", stopAllAptJobs)
@@ -109,6 +110,11 @@ func startGinServer() {
 		}
 	}
 
+}
+
+func reinit(c *gin.Context) {
+	apt := c.Param("apt")
+	reInitAirport(apt)
 }
 
 func stopJobs(c *gin.Context) {

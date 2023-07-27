@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -34,28 +33,19 @@ const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soa
 </soapenv:Body>
 </soapenv:Envelope>`
 
+func GetRepo(airportCode string) *Repository {
+	for _, repo := range repoList {
+		if repo.Airport == airportCode {
+			return &repo
+		}
+	}
+	return nil
+}
+
 func InitRepositories() {
 
-	ex, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	exPath := filepath.Dir(ex)
-
-	fileContent, err := os.Open(filepath.Join(exPath, "airports.json"))
-
-	if err != nil {
-		log.Fatal(err)
-		return
-	}
-
-	defer fileContent.Close()
-
-	byteResult, _ := ioutil.ReadAll(fileContent)
-
 	var repos Repositories
-
-	json.Unmarshal([]byte(byteResult), &repos)
+	json.Unmarshal([]byte(readBytesFromFile("airports.json")), &repos)
 
 	for _, v := range repos.Repositories {
 		v.Flights = make(map[string]Flight)
@@ -67,30 +57,36 @@ func InitRepositories() {
 		repoList = append(repoList, v)
 	}
 
-	//repositoryUpdateChannel <- 1
-
 	for _, v := range repoList {
 		initRepository(v.Airport)
 	}
 }
 
-func addResourcesToMap(resources []FixedResource, mapp map[string]ResourceAllocationMap) map[string]ResourceAllocationMap {
+func reInitAirport(aptCode string) {
 
-	mapMutex.Lock()
-	for _, c := range resources {
-		r := ResourceAllocationMap{
-			Resource:             c,
-			FlightAllocationsMap: make(map[string]AllocationItem),
+	var repos Repositories
+	json.Unmarshal([]byte(readBytesFromFile("airports.json")), &repos)
+
+	for _, v := range repos.Repositories {
+		if v.Airport != aptCode {
+			continue
 		}
-
-		if _, ok := mapp[c.Name]; !ok {
-			mapp[c.Name] = r
-		}
-
+		v.Flights = make(map[string]Flight)
+		v.CarouselAllocationMap = make(map[string]ResourceAllocationMap)
+		v.CheckInAllocationMap = make(map[string]ResourceAllocationMap)
+		v.StandAllocationMap = make(map[string]ResourceAllocationMap)
+		v.GateAllocationMap = make(map[string]ResourceAllocationMap)
+		v.ChuteAllocationMap = make(map[string]ResourceAllocationMap)
+		repoList = append(repoList, v)
 	}
-	mapMutex.Unlock()
 
-	return mapp
+	s := refreshSchedulerMap[aptCode]
+	if s != nil {
+		s.Clear()
+	}
+
+	initRepository(aptCode)
+
 }
 
 func initRepository(airportCode string) {
@@ -151,6 +147,26 @@ func populateResourceMaps(airportCode string) {
 	xml.Unmarshal(getResource(airportCode, "Chutes"), &chutes)
 	addResourcesToMap(chutes.Values, GetRepo(airportCode).ChuteAllocationMap)
 }
+
+func addResourcesToMap(resources []FixedResource, mapp map[string]ResourceAllocationMap) map[string]ResourceAllocationMap {
+
+	mapMutex.Lock()
+	for _, c := range resources {
+		r := ResourceAllocationMap{
+			Resource:             c,
+			FlightAllocationsMap: make(map[string]AllocationItem),
+		}
+
+		if _, ok := mapp[c.Name]; !ok {
+			mapp[c.Name] = r
+		}
+
+	}
+	mapMutex.Unlock()
+
+	return mapp
+}
+
 func maintainRepository(airportCode string) {
 
 	// Schedule the regular refresh
@@ -204,9 +220,17 @@ func scheduleUpdates(airportCode string) {
 	startTime, _ := time.ParseInLocation("2006-01-02T15:04:05", startTimeStr, loc)
 
 	s := gocron.NewScheduler(time.Local)
+
+	refreshSchedulerMap[airportCode] = s
+
+	// Schedule the regular update of the repositoiry
 	s.Every(serviceConfig.ScheduleUpdateJobIntervalInHours).Hours().StartAt(startTime).Do(func() { updateRepository(airportCode) })
+
+	// Kick off an intial load on startup
 	s.Every(1).Millisecond().LimitRunsTo(1).Do(func() { loadRepositoryOnStartup(airportCode) })
+
 	logger.Info(fmt.Sprintf("Regular updates of the repository have been scheduled at %s for every %v hours", startTimeStr, serviceConfig.ScheduleUpdateJobIntervalInHours))
+
 	s.StartBlocking()
 }
 func loadRepositoryOnStartup(airportCode string) {
@@ -499,6 +523,8 @@ func deleteAllocation(flight Flight, airportCode string) {
 	repo := GetRepo(airportCode)
 	flightId := flight.GetFlightID()
 
+	mapMutex.Lock()
+
 	for _, v := range repo.CheckInAllocationMap {
 		delete(v.FlightAllocationsMap, flightId)
 	}
@@ -514,6 +540,8 @@ func deleteAllocation(flight Flight, airportCode string) {
 	for _, v := range repo.ChuteAllocationMap {
 		delete(v.FlightAllocationsMap, flightId)
 	}
+
+	mapMutex.Unlock()
 }
 func getResource(airportCode string, resourceType string) []byte {
 

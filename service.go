@@ -72,15 +72,6 @@ loop:
 
 func runService(name string, isDebug bool) {
 	var err error
-	// if isDebug {
-	// 	logger = debug.New(name)
-	// } else {
-	// 	logger, err = eventlog.Open(name)
-	// 	if err != nil {
-	// 		return
-	// 	}
-	// }
-	// defer logger.Close()
 
 	logger.Info(fmt.Sprintf("starting %s service", name))
 	run := svc.Run

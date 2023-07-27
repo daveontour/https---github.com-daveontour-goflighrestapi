@@ -500,76 +500,46 @@ type Change struct {
 type GateSlotsChange struct {
 	OldValue struct {
 		GateSlot struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value []PropertyValuePair `xml:"Value"`
 		} `xml:"GateSlot"`
 	} `xml:"OldValue"`
 	NewValue struct {
 		GateSlot struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value []PropertyValuePair `xml:"Value"`
 		} `xml:"GateSlot"`
 	} `xml:"NewValue"`
 }
 type StandSlotChange struct {
 	OldValue struct {
 		SdandSlot struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value []PropertyValuePair `xml:"Value"`
 		} `xml:"StandSlot"`
 	} `xml:"OldValue"`
 	NewValue struct {
 		StandSlot struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value []PropertyValuePair `xml:"Value"`
 		} `xml:"StandSlot"`
 	} `xml:"NewValue"`
 }
 type CheckInSlotsChange struct {
 	OldValue struct {
 		CheckInSlot []struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value   []PropertyValuePair `xml:"Value"`
 			CheckIn struct {
-				Value []struct {
-					Text         string `xml:",chardata"`
-					PropertyName string `xml:"propertyName,attr"`
-				} `xml:"Value"`
-				Area struct {
-					Value struct {
-						Text         string `xml:",chardata"`
-						PropertyName string `xml:"propertyName,attr"`
-					} `xml:"Value"`
+				Value []PropertyValuePair `xml:"Value"`
+				Area  struct {
+					Value PropertyValuePair `xml:"Value"`
 				} `xml:"Area"`
 			} `xml:"CheckIn"`
 		} `xml:"CheckInSlot"`
 	} `xml:"OldValue"`
 	NewValue struct {
 		CheckInSlot []struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value   []PropertyValuePair `xml:"Value"`
 			CheckIn struct {
-				Value []struct {
-					Text         string `xml:",chardata"`
-					PropertyName string `xml:"propertyName,attr"`
-				} `xml:"Value"`
-				Area struct {
-					Value struct {
-						Text         string `xml:",chardata"`
-						PropertyName string `xml:"propertyName,attr"`
-					} `xml:"Value"`
+				Value []PropertyValuePair `xml:"Value"`
+				Area  struct {
+					Value PropertyValuePair `xml:"Value"`
 				} `xml:"Area"`
 			} `xml:"CheckIn"`
 		} `xml:"CheckInSlot"`
@@ -578,24 +548,15 @@ type CheckInSlotsChange struct {
 type CarouselSlotsChange struct {
 	OldValue struct {
 		CarouselSlot struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value []PropertyValuePair `xml:"Value"`
 		} `xml:"CarouselSlot"`
 	} `xml:"OldValue"`
 	NewValue struct {
 		CarouselSlot struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value    []PropertyValuePair `xml:"Value"`
 			Carousel struct {
-				Value []struct {
-					Text         string `xml:",chardata"`
-					PropertyName string `xml:"propertyName,attr"`
-				} `xml:"Value"`
-				Area struct {
+				Value []PropertyValuePair `xml:"Value"`
+				Area  struct {
 					Value struct {
 						Text         string `xml:",chardata"`
 						PropertyName string `xml:"propertyName,attr"`
@@ -617,20 +578,11 @@ type ChuteSlotsChange struct {
 	} `xml:"OldValue"`
 	NewValue struct {
 		ChuteSlot struct {
-			Value []struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value PropertyValuePair `xml:"Value"`
 			Chute struct {
-				Value []struct {
-					Text         string `xml:",chardata"`
-					PropertyName string `xml:"propertyName,attr"`
-				} `xml:"Value"`
-				Area struct {
-					Value struct {
-						Text         string `xml:",chardata"`
-						PropertyName string `xml:"propertyName,attr"`
-					} `xml:"Value"`
+				Value []PropertyValuePair `xml:"Value"`
+				Area  struct {
+					Value PropertyValuePair `xml:"Value"`
 				} `xml:"Area"`
 			} `xml:"Chute"`
 		} `xml:"ChuteSlot"`
@@ -645,10 +597,7 @@ type AircraftTypeChange struct {
 					CodeContext string `xml:"codeContext,attr"`
 				} `xml:"AircraftTypeCode"`
 			} `xml:"AircraftTypeId"`
-			Value struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value PropertyValuePair `xml:"Value"`
 		} `xml:"AircraftType"`
 	} `xml:"OldValue"`
 	NewValue struct {
@@ -659,10 +608,7 @@ type AircraftTypeChange struct {
 					CodeContext string `xml:"codeContext,attr"`
 				} `xml:"AircraftTypeCode"`
 			} `xml:"AircraftTypeId"`
-			Value struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value PropertyValuePair `xml:"Value"`
 		} `xml:"AircraftType"`
 	} `xml:"NewValue"`
 }
@@ -673,10 +619,7 @@ type AircraftChange struct {
 			AircraftId struct {
 				Registration string `xml:"Registration"`
 			} `xml:"AircraftId"`
-			Value struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value PropertyValuePair `xml:"Value"`
 		} `xml:"Aircraft"`
 	} `xml:"OldValue"`
 	NewValue struct {
@@ -684,10 +627,7 @@ type AircraftChange struct {
 			AircraftId struct {
 				Registration string `xml:"Registration"`
 			} `xml:"AircraftId"`
-			Value struct {
-				Text         string `xml:",chardata"`
-				PropertyName string `xml:"propertyName,attr"`
-			} `xml:"Value"`
+			Value PropertyValuePair `xml:"Value"`
 		} `xml:"Aircraft"`
 	} `xml:"NewValue"`
 }
@@ -746,23 +686,23 @@ type Envelope struct {
 		Text               string `xml:",chardata"`
 		GetFlightsResponse struct {
 			//Text             string `xml:",chardata"`
-			Xmlns            string `xml:"xmlns,attr"`
+			//Xmlns            string `xml:"xmlns,attr"`
 			GetFlightsResult struct {
-				Text             string `xml:",chardata"`
+				//Text             string `xml:",chardata"`
 				WebServiceResult struct {
 					//Text        string `xml:",chardata"`
-					ApiVersion  string `xml:"apiVersion,attr"`
-					Xsd         string `xml:"xsd,attr"`
-					Xsi         string `xml:"xsi,attr"`
+					//ApiVersion  string `xml:"apiVersion,attr"`
+					//Xsd         string `xml:"xsd,attr"`
+					//Xsi         string `xml:"xsi,attr"`
 					ApiResponse struct {
-						Text   string `xml:",chardata"`
-						Status struct {
-							Text  string `xml:",chardata"`
-							Xmlns string `xml:"xmlns,attr"`
-						} `xml:"Status"`
+						//Text   string `xml:",chardata"`
+						// Status struct {
+						// 	Text  string `xml:",chardata"`
+						// 	Xmlns string `xml:"xmlns,attr"`
+						// } `xml:"Status"`
 						Data struct {
 							///	Text    string  `xml:",chardata"`
-							Xmlns   string  `xml:"xmlns,attr"`
+							//Xmlns   string  `xml:"xmlns,attr"`
 							Flights Flights `xml:"Flights"`
 						} `xml:"Data"`
 					} `xml:"ApiResponse"`

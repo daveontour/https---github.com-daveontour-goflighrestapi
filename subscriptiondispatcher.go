@@ -47,7 +47,7 @@ NextSub:
 		for _, change := range flt.FlightChanges.Changes {
 
 			if contains(sub.ParameterChange, change.PropertyName) {
-				executeChangePush(sub, "", "", flt)
+				go executeChangePush(sub, flt)
 				break NextSub
 			}
 
@@ -57,47 +57,47 @@ NextSub:
 				(change.PropertyName == "Carousel" && sub.CarouselChange) ||
 				(change.PropertyName == "Chute" && sub.ChuteChange) {
 
-				executeChangePush(sub, "", "", flt)
+				go executeChangePush(sub, flt)
 				break NextSub
 			}
 
 		}
 
 		if sub.CheckInChange && flt.FlightChanges.CheckinSlotsChange != nil {
-			executeChangePush(sub, "", "", flt)
+			go executeChangePush(sub, flt)
 			continue
 		}
 		if sub.GateChange && flt.FlightChanges.GateSlotsChange != nil {
-			executeChangePush(sub, "", "", flt)
+			executeChangePush(sub, flt)
 			continue
 		}
 		if sub.StandChange && flt.FlightChanges.StandSlotsChange != nil {
-			executeChangePush(sub, "", "", flt)
+			go executeChangePush(sub, flt)
 			continue
 		}
 		if sub.ChuteChange && flt.FlightChanges.ChuteSlotsChange != nil {
-			executeChangePush(sub, "", "", flt)
+			go executeChangePush(sub, flt)
 			continue
 		}
 		if sub.CarouselChange && flt.FlightChanges.CarouselSlotsChange != nil {
-			executeChangePush(sub, "", "", flt)
+			executeChangePush(sub, flt)
 			continue
 		}
 
 		if sub.AircraftTypeOrRegoChange && flt.FlightChanges.AircraftTypeChange != nil {
-			executeChangePush(sub, "", "", flt)
+			go executeChangePush(sub, flt)
 			continue
 		}
 		if sub.AircraftTypeOrRegoChange && flt.FlightChanges.AircraftChange != nil {
-			executeChangePush(sub, "", "", flt)
+			go executeChangePush(sub, flt)
 			continue
 		}
 	}
 }
 
-func executeChangePush(sub UserChangeSubscription, userToken, userName string, flight Flight) {
+func executeChangePush(sub UserChangeSubscription, flight Flight) {
 
-	logger.Info(fmt.Sprintf("Executing Change Push for User %s", userName))
+	logger.Info(fmt.Sprintf("Executing Change Push for User "))
 
 	var error GetFlightsError
 
@@ -121,7 +121,7 @@ func executeChangePush(sub UserChangeSubscription, userToken, userName string, f
 
 	_, sendErr := http.DefaultClient.Do(req)
 	if sendErr != nil {
-		logger.Error(fmt.Sprintf("Change Push for user %s: Error making http request: %s\n", userName, sendErr))
+		logger.Error(fmt.Sprintf("Change Push for user. Error making http request: %s\n", sendErr))
 	}
 
 }

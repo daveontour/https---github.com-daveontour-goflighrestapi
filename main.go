@@ -36,57 +36,20 @@ var flightDeletedChannel = make(chan Flight)
 var flightsInitChannel = make(chan int)
 
 var schedulerMap = make(map[string]*gocron.Scheduler)
+var refreshSchedulerMap = make(map[string]*gocron.Scheduler)
 var userChangeSubscriptions []UserChangeSubscription
-
-//var flightList = FlightList{}
-
-func GetRepo(airportCode string) *Repository {
-	for _, repo := range repoList {
-		if repo.Airport == airportCode {
-			return &repo
-		}
-	}
-	return nil
-}
-func usage(errmsg string) {
-	fmt.Fprintf(os.Stderr,
-		"%s\n\n"+
-			"usage: %s <command>\n"+
-			"       where <command> is one of\n"+
-			"       install, remove, debug, start, stop, pause or continue.\n",
-		errmsg, os.Args[0])
-	os.Exit(2)
-}
-
-func getServiceConfig() ServiceConfig {
-	ex, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	exPath := filepath.Dir(ex)
-
-	fileContent, err := os.Open(filepath.Join(exPath, "service.json"))
-	byteResult, _ := ioutil.ReadAll(fileContent)
-
-	var serviceConfig ServiceConfig
-	json.Unmarshal([]byte(byteResult), &serviceConfig)
-
-	return serviceConfig
-}
-
-// func main() {
-
-// 	startGinServer()
-
-// }
 
 func main() {
 
-	logger.SetLevel(log.InfoLevel)
-	logger.Info("STARTING PROGRAM")
 	serviceConfig = getServiceConfig()
 	svcName := serviceConfig.ServiceName
 	isDebug = serviceConfig.DebugService
+
+	logger.SetLevel(logrus.InfoLevel)
+
+	if isDebug {
+		logger.SetLevel(logrus.DebugLevel)
+	}
 
 	flag.StringVar(&svcName, "name", svcName, "name of the service")
 	flag.Parse()
@@ -129,4 +92,30 @@ func main() {
 		log.Fatalf("failed to %s %s: %v", cmd, svcName, err)
 	}
 	return
+}
+
+func usage(errmsg string) {
+	fmt.Fprintf(os.Stderr,
+		"%s\n\n"+
+			"usage: %s <command>\n"+
+			"       where <command> is one of\n"+
+			"       install, remove, debug, start, stop, pause or continue.\n",
+		errmsg, os.Args[0])
+	os.Exit(2)
+}
+
+func getServiceConfig() ServiceConfig {
+	ex, err := os.Executable()
+	if err != nil {
+		panic(err)
+	}
+	exPath := filepath.Dir(ex)
+
+	fileContent, err := os.Open(filepath.Join(exPath, "service.json"))
+	byteResult, _ := ioutil.ReadAll(fileContent)
+
+	var serviceConfig ServiceConfig
+	json.Unmarshal([]byte(byteResult), &serviceConfig)
+
+	return serviceConfig
 }
