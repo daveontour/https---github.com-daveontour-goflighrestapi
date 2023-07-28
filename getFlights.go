@@ -72,14 +72,21 @@ func getRequestedFlightsCommon(apt, direction, airline, from, to, route, userTok
 	userProfile := getUserProfile(c, userToken)
 	response.User = userProfile.UserName
 
-	// Set Default airport if none set
-	if apt == "" && userProfile.DefaultAirport != "" {
-		apt = userProfile.DefaultAirport
+	if apt == "" {
+		//apt = userProfile.DefaultAirport
+
+		return response, GetFlightsError{
+			StatusCode: http.StatusBadRequest,
+			Err:        errors.New("Airport not specified"),
+		}
 	}
-	// Set override airport if specified in configuration
-	if userProfile.OverrideAirport != "" {
-		apt = userProfile.OverrideAirport
-		response.AddWarning(fmt.Sprintf("Airport set to %s by the administration configuration", apt))
+
+	// Check that the requested airport exists in the repository
+	if GetRepo(apt) == nil {
+		return response, GetFlightsError{
+			StatusCode: http.StatusBadRequest,
+			Err:        errors.New(fmt.Sprintf("Airport %s not found", apt)),
+		}
 	}
 
 	// Set Default airline if none set
@@ -87,27 +94,13 @@ func getRequestedFlightsCommon(apt, direction, airline, from, to, route, userTok
 		airline = userProfile.DefaultAirline
 		response.AddWarning(fmt.Sprintf("Airline set to %s by the administration configuration", airline))
 	}
-	// Set override airline if specified in configuration
-	if userProfile.OverrideAirline != "" {
-		airline = userProfile.OverrideAirline
-		response.AddWarning(fmt.Sprintf("Airline set to %s by the administration configuration", airline))
-	}
 
-	//Check that the user is allowed to access the requested airport
+	//Check that the user is allowed to access the requested airline
 	if !contains(userProfile.AllowedAirlines, apt) &&
 		!contains(userProfile.AllowedAirlines, "*") {
 		return response, GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("User is not allowed to access requested airline"),
-		}
-	}
-
-	// Check that the requested airport exists in the repository
-	//	_, ok := repoMap[apt]
-	if GetRepo(apt) == nil {
-		return response, GetFlightsError{
-			StatusCode: http.StatusBadRequest,
-			Err:        errors.New(fmt.Sprintf("Airport %s not found", apt)),
 		}
 	}
 
@@ -117,7 +110,7 @@ func getRequestedFlightsCommon(apt, direction, airline, from, to, route, userTok
 	request := Request{Direction: direction, Airline: airline, From: from, To: to, UserProfile: userProfile, Route: route}
 
 	// Reform the request based on the user Profile and the request parameters
-	request, response = normaliseRequest(request, response, c, qf)
+	request, response = processCustomFieldQueries(request, response, c, qf)
 
 	// If the user is requesting a particular airline, check that they are allowed to access that airline
 	if airline != "" && userProfile.AllowedAirlines != nil {
@@ -147,81 +140,59 @@ func getRequestedFlightsCommon(apt, direction, airline, from, to, route, userTok
 	}
 }
 
-func normaliseRequest(request Request, response Response, c *gin.Context, qf []ParameterValuePair) (Request, Response) {
-	if request.UserProfile.AllowedAirlines != nil &&
-		!contains(request.UserProfile.AllowedAirlines, "*") {
-		response.AddWarning(fmt.Sprintf("Users request restricted by administrator to airlines %s", request.UserProfile.AllowedAirlines))
+func processCustomFieldQueries(request Request, response Response, c *gin.Context, qf []ParameterValuePair) (Request, Response) {
+
+	customFieldQureyMap := make(map[string]string)
+
+	if c != nil {
+		// Find the potential customField queries in the request
+		queryMap := c.Request.URL.Query()
+		for k, v := range queryMap {
+			if !contains(reservedParameters, k) {
+				customFieldQureyMap[k] = v[0]
+			}
+		}
+	} else if qf != nil {
+		for _, pvPair := range qf {
+			parameter := pvPair.Parameter
+			value := pvPair.Value
+			customFieldQureyMap[parameter] = value
+		}
+	}
+	// (even if there are rubbish values still in the request, the GetPropoerty function will handle it
+
+	// Put in new default values
+	if request.UserProfile.DefaultQueryableCustomFields != nil {
+		for _, pair := range request.UserProfile.DefaultQueryableCustomFields {
+			if v, ok := customFieldQureyMap[pair.Parameter]; ok {
+				if v != pair.Value {
+					response.AddWarning(fmt.Sprintf("Setting query against %s to default value %s", pair.Parameter, pair.Value))
+				}
+			}
+			customFieldQureyMap[pair.Parameter] = pair.Value
+		}
+	}
+
+	// Remove any queries against unauthorised fields
+	remove := []string{}
+	for k, _ := range customFieldQureyMap {
+		if !contains(request.UserProfile.AllowedCustomFields, k) && !contains(request.UserProfile.AllowedCustomFields, "*") {
+			remove = append(remove, k)
+		}
+	}
+
+	for _, k := range remove {
+		delete(customFieldQureyMap, k)
+		response.AddWarning(fmt.Sprintf("Ignoring unauthorised query against custom field: %s", k))
 	}
 
 	presentQueryableParameters := []ParameterValuePair{}
-	// Set up the custom parameter queries if required
-	if request.UserProfile.QueryableCustomFields != nil {
 
-		if c != nil {
-			queryMap := c.Request.URL.Query()
-
-			// Go through the querable parameters
-
-			for _, queryableParameter := range request.UserProfile.QueryableCustomFields {
-
-				value, present := queryMap[queryableParameter]
-
-				if present && !contains(request.UserProfile.AllowedCustomFields, queryableParameter) {
-					response.AddWarning(fmt.Sprintf("Non queryable parameter specified: %s", queryableParameter))
-				}
-
-				if present {
-
-					// Check for override
-
-					replace := false
-					for _, pair := range request.UserProfile.OverrideQueryableCustomFields {
-						if pair.Parameter == queryableParameter {
-							presentQueryableParameters = append(presentQueryableParameters, ParameterValuePair{Parameter: queryableParameter, Value: pair.Value})
-							replace = true
-							response.AddWarning(fmt.Sprintf("Query value of %s replaced with %s by admnistration configuration", pair.Parameter, pair.Value))
-							break
-						}
-					}
-
-					if !replace {
-						presentQueryableParameters = append(presentQueryableParameters, ParameterValuePair{Parameter: queryableParameter, Value: value[0]})
-					}
-				}
-			}
-		} else if qf != nil {
-			for _, pvPair := range qf {
-
-				parameter := pvPair.Parameter
-				value := pvPair.Value
-
-				// Check for override
-
-				replace := false
-				for _, pair := range request.UserProfile.OverrideQueryableCustomFields {
-					if pair.Parameter == parameter {
-						presentQueryableParameters = append(presentQueryableParameters, ParameterValuePair{Parameter: parameter, Value: pair.Value})
-						replace = true
-						response.AddWarning(fmt.Sprintf("Query value of %s replaced with %s by admnistration configuration", pair.Parameter, pair.Value))
-						break
-					}
-				}
-
-				if !replace {
-					presentQueryableParameters = append(presentQueryableParameters, ParameterValuePair{Parameter: parameter, Value: value})
-				}
-
-			}
-		}
-		request.PresentQueryableParameters = presentQueryableParameters
+	for k, v := range customFieldQureyMap {
+		presentQueryableParameters = append(presentQueryableParameters, ParameterValuePair{Parameter: k, Value: v})
 	}
 
-	if presentQueryableParameters == nil || len(presentQueryableParameters) == 0 {
-		if request.UserProfile.DefaultQueryableCustomFields != nil {
-			request.PresentQueryableParameters = request.UserProfile.DefaultQueryableCustomFields
-			response.AddWarning("Custom Field query set to default by Administrator Configuration")
-		}
-	}
+	request.PresentQueryableParameters = presentQueryableParameters
 
 	return request, response
 }
@@ -271,14 +242,20 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 NextFlight:
 	for _, f := range flights {
 
+		if f.GetSTO().Before(from) {
+			continue
+		}
+
+		if f.GetSTO().After(to) {
+			continue
+		}
+
 		for _, queryableParameter := range request.PresentQueryableParameters {
 			queryValue := queryableParameter.Value
 			flightValue := f.GetProperty(queryableParameter.Parameter)
-			if flightValue == "" {
-				break NextFlight
-			}
-			if queryValue != flightValue {
-				break NextFlight
+
+			if flightValue == "" || queryValue != flightValue {
+				continue NextFlight
 			}
 		}
 
@@ -297,14 +274,6 @@ NextFlight:
 
 		// RequestedRoute filter
 		if request.Route != "" && !strings.Contains(f.GetFlightRoute(), request.Route) {
-			continue
-		}
-
-		if f.GetSTO().Before(from) {
-			continue
-		}
-
-		if f.GetSTO().After(to) {
 			continue
 		}
 
@@ -342,14 +311,10 @@ NextFlight:
 	return response, nil
 }
 
-func prune(flight Flight, request Request) Flight {
+// Creates a copy of the flight record with the custom fields that the user is allowed to see
+func prune(flight Flight, request Request) (flDup Flight) {
 
-	/*
-	 *   Creates a copy of the flight record with the custom fields that the user is allowed to see
-	 */
-
-	flDup := flight.DuplicateFlight()
-
+	flDup = flight.DuplicateFlight()
 	flDup.FlightState.Value = []Value{}
 
 	// If Allowed CustomFields is not nil, then filter the custome fields
@@ -382,5 +347,5 @@ func prune(flight Flight, request Request) Flight {
 
 	flDup.FlightChanges.Changes = changes
 
-	return flDup
+	return
 }

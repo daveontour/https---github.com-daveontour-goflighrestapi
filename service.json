@@ -8,5 +8,6 @@
     "debugService": true,
     "useHTTPS": false,
     "keyFile":"keyFile",
-    "certFile":"certFile"
+    "certFile":"certFile",
+    "testHTTPServer":false
 }

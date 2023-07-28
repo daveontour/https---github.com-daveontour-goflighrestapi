@@ -250,7 +250,7 @@ func updateRepository(airportCode string) {
 		chunkSize = 2
 	}
 
-	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s, Flight Chnk Size: %v ", airportCode, chunkSize))
+	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s. Getting flights. Chunk Size: %v days", airportCode, chunkSize))
 
 	repoMutex.Lock()
 	defer repoMutex.Unlock()

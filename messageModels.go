@@ -110,23 +110,19 @@ type ServiceConfig struct {
 	UseHTTPS                         bool   `json:"useHTTPS"`
 	KeyFile                          string `json:"keyFile"`
 	CertFile                         string `json:"certFile"`
+	TestHTTPServer                   bool   `json:"testHTTPServer"`
 }
 
 type UserProfile struct {
-	UserName                      string                   `json:"username"`
-	Key                           string                   `json:"key"`
-	AllowedAirports               []string                 `json:"allowedairports"`
-	AllowedAirlines               []string                 `json:"allowedairlines"`
-	AllowedCustomFields           []string                 `json:"allowedcustomfields"`
-	QueryableCustomFields         []string                 `json:"queryablecustomfields"`
-	DefaultAirport                string                   `json:"defaultairport"`
-	OverrideAirport               string                   `json:"overrideairport"`
-	DefaultAirline                string                   `json:"defaultairline"`
-	OverrideAirline               string                   `json:"overrideairline"`
-	DefaultQueryableCustomFields  []ParameterValuePair     `json:"defaultqueryablecustomfields"`
-	OverrideQueryableCustomFields []ParameterValuePair     `json:"overridequeryablecustomfields"`
-	UserPushSubscriptions         []UserPushSubscription   `json:"pushsubscriptions"`
-	UserChangeSubscriptions       []UserChangeSubscription `json:"changesubscriptions"`
+	UserName                     string                   `json:"username"`
+	Key                          string                   `json:"key"`
+	AllowedAirports              []string                 `json:"allowedairports"`
+	AllowedAirlines              []string                 `json:"allowedairlines"`
+	AllowedCustomFields          []string                 `json:"allowedcustomfields"`
+	DefaultAirline               string                   `json:"defaultairline"`
+	DefaultQueryableCustomFields []ParameterValuePair     `json:"defaultqueryablecustomfields"`
+	UserPushSubscriptions        []UserPushSubscription   `json:"pushsubscriptions"`
+	UserChangeSubscriptions      []UserChangeSubscription `json:"changesubscriptions"`
 }
 
 type UserPushSubscription struct {

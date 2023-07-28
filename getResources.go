@@ -132,8 +132,12 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 	response.User = userProfile.UserName
 
 	// Set Default airport if none set
-	if apt == "" && userProfile.DefaultAirport != "" {
-		apt = userProfile.DefaultAirport
+	if apt == "" {
+		//apt = userProfile.DefaultAirport
+		return response, GetFlightsError{
+			StatusCode: http.StatusBadRequest,
+			Err:        errors.New("Airport not specified"),
+		}
 	}
 
 	//Check that the user is allowed to access the requested airport
@@ -287,8 +291,9 @@ func getConfiguredResources(c *gin.Context) {
 	response.User = userProfile.UserName
 
 	// Set Default airport if none set
-	if apt == "" && userProfile.DefaultAirport != "" {
-		apt = userProfile.DefaultAirport
+	if apt == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": "Airport not specified %s"})
+		return
 	}
 
 	//Check that the user is allowed to access the requested airport

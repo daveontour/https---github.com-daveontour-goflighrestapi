@@ -31,7 +31,11 @@ func startGinServer() {
 	router := gin.New()
 
 	// Configure all the endpoints for the HTTP Server
-	router.POST("/test", testQuery)
+
+	// Test purposes only to just printout whatever was received by the server
+	if serviceConfig.TestHTTPServer {
+		router.POST("/test", testQuery)
+	}
 	router.GET("/reinit/:apt", reinit)
 	router.GET("/getFlights/:apt", getRequestedFlightsAPI)
 	router.GET("/stopJobs/:apt/:userToken", stopJobs)

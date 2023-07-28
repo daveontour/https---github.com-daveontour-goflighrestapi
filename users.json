@@ -6,8 +6,6 @@
             "allowedairports":["AUH"],
             "allowedairlines":["WY","QF","*"],
             "allowedcustomfields":["FlightUniqueID","Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax","S---_Terminal"],
-            "defaultairport":"AUH",
-            "queryablecustomfields": ["Il--_DisembarkingFirstPad","Sh--_GroundHandler"],
             "changesubscriptions":[
                 {
                     "Enabled":true,
@@ -24,7 +22,7 @@
                     "CustomFieldChange":["Stand"],
                     "CreateFlight": true,
                     "DeleteFlight":true,
-                    "UpdateFlight":false
+                    "UpdateFlight":true
                 }
             ],
             "pushsubscriptions": [

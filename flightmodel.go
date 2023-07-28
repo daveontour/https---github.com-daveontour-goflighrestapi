@@ -610,7 +610,7 @@ type FlightChanges struct {
 	StandSlotsChange    *StandSlotChange     `xml:"StandSlotsChange" json:"StandSlotsChange"`
 	ChuteSlotsChange    *ChuteSlotsChange    `xml:"ChuteSlotsChange" json:"ChuteSlotsChange"`
 	CheckinSlotsChange  *CheckInSlotsChange  `xml:"CheckInSlotsChange" json:"CheckInSlotsChange"`
-	Changes             []Change             `xml:"Change"`
+	Changes             []Change             `xml:"PropertyChanges"`
 }
 type Flight struct {
 	Action        string        `xml:"Action" json:"Action"`
