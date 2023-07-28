@@ -111,6 +111,8 @@ type ServiceConfig struct {
 	KeyFile                          string `json:"keyFile"`
 	CertFile                         string `json:"certFile"`
 	TestHTTPServer                   bool   `json:"testHTTPServer"`
+	LogFile                          string `json:"logFile"`
+	RequestLogFile                   string `json:"requestlogFile"`
 }
 
 type UserProfile struct {

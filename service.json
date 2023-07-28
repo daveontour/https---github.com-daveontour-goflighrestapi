@@ -9,5 +9,7 @@
     "useHTTPS": false,
     "keyFile":"keyFile",
     "certFile":"certFile",
-    "testHTTPServer":false
+    "testHTTPServer":false,
+    "logfile": "c:/Users/dave_/Desktop/FLIGHTRESOURCERestAPI.log",
+    "requestlogfile": "c:/Users/dave_/Desktop/RequestRestAPI.log"
 }

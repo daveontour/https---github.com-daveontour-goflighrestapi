@@ -28,6 +28,10 @@ func getResourceSub(sub UserPushSubscription, userToken string) (ResourceRespons
 
 func getResourceAPI(c *gin.Context) {
 
+	// Get the profile of the user making the request
+	userProfile := getUserProfile(c, "")
+	requestLogger.Info(fmt.Sprintf("RestAPI request for user '%s' at %s: %s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI)) // Create the response object so we can return early if required
+
 	apt := c.Param("apt")
 
 	flightID := c.Query("flight")
@@ -68,7 +72,6 @@ func getResourceAPI(c *gin.Context) {
 
 func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, userToken string, c *gin.Context) (ResourceResponse, GetFlightsError) {
 
-	// Create the response object so we can return early if required
 	response := ResourceResponse{}
 	//	c.Writer.Header().Set("Content-Type", "application/json")
 
@@ -266,6 +269,11 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 }
 
 func getConfiguredResources(c *gin.Context) {
+
+	// Get the profile of the user making the request
+	userProfile := getUserProfile(c, "")
+	requestLogger.Info(fmt.Sprintf("RestAPI request for user '%s' at %s: %s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
+
 	apt := c.Param("apt")
 	resourceType := c.Param("resourceType")
 
@@ -287,7 +295,7 @@ func getConfiguredResources(c *gin.Context) {
 	var err error
 
 	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, "")
+	//userProfile := getUserProfile(c, "")
 	response.User = userProfile.UserName
 
 	// Set Default airport if none set

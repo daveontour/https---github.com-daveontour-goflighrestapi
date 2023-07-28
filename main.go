@@ -14,13 +14,16 @@ import (
 	"flag"
 
 	//"log"
+	//"github.com/fsnotify/fsnotify"
 	"github.com/go-co-op/gocron"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	easy "github.com/t-tomalak/logrus-easy-formatter"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
 	"golang.org/x/sys/windows/svc/mgr"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 // var repoMap = make(map[string]Repository)
@@ -34,6 +37,7 @@ var serviceConfig ServiceConfig
 var isDebug bool = false
 
 var logger = logrus.New()
+var requestLogger = logrus.New()
 
 const layout = "2006-01-02T15:04:05"
 
@@ -62,8 +66,35 @@ func main() {
 	serviceConfig = getServiceConfig()
 	svcName := serviceConfig.ServiceName
 	isDebug = serviceConfig.DebugService
+	logger.Formatter = &easy.Formatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		LogFormat:       "[%lvl%]: %time% - %msg%\n",
+	}
+	if serviceConfig.LogFile != "" {
+		logger.SetOutput(&lumberjack.Logger{
+			Filename:   serviceConfig.LogFile,
+			MaxSize:    50, // megabytes
+			MaxBackups: 3,
+			MaxAge:     28,   //days
+			Compress:   true, // disabled by default
+		})
+	}
+	requestLogger.Formatter = &easy.Formatter{
+		TimestampFormat: "2006-01-02 15:04:05",
+		LogFormat:       "[%lvl%]: %time% - %msg%\n",
+	}
+	if serviceConfig.RequestLogFile != "" {
+		requestLogger.SetOutput(&lumberjack.Logger{
+			Filename:   serviceConfig.RequestLogFile,
+			MaxSize:    50, // megabytes
+			MaxBackups: 3,
+			MaxAge:     28,   //days
+			Compress:   true, // disabled by default
+		})
+	}
 
 	logger.SetLevel(logrus.InfoLevel)
+	requestLogger.SetLevel(logrus.InfoLevel)
 
 	if isDebug {
 		logger.SetLevel(logrus.DebugLevel)
