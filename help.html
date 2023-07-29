@@ -1,0 +1,176 @@
+<html>
+
+<body style="font-size:12.0pt;font-family:'Courier New'">
+  <p><u><strong><span style="font-size:16px">Get Flight and Resource Allocation from AMS</strong></u></p>
+
+  <p><span style="font-size:20px"><strong>/getFlights/[Airport]?{options}</strong></span></p>
+  <p>Retreive flight details</p>
+
+  <table border="1" cellpadding="1" cellspacing="1" style="width:1050px">
+    <tbody>
+      <tr>
+        <td style="width:190px"><strong>Airport</strong></td>
+        <td style="width:600px">Three letter IATA airport code to the desired airport</td>
+        <td style="width:260px">&nbsp;</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>al or airline</strong></td>
+        <td style="width:600px">Two letter IATA code for the airline, eg. BA, DL, LH, MH (default: all airlines)</td>
+        <td style="width:260px">/getFlights/APT?al=QF</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>d or direction</strong></td>
+        <td style="width:600px">The direction of flight relative to the home airport. either 'Arr' or 'Dep'</td>
+        <td style="width:260px">/getFlights/APT?d=Arr</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>r or route</strong></td>
+        <td style="width:600px">The route of the flight</td>
+        <td style="width:260px">/getFlights/APT?r=MEL</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>from</strong></td>
+        <td style="width:600px">Number of hours relative to 'now' for the earliest scheduled time of operation for the
+          flight, eg. -3 (default: -12)</td>
+        <td style="width:260px">/getFlights/APT?from=-12</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>to</strong></td>
+        <td style="width:600px">Number of hours relative to 'now' for the latest scheduled time of operation for the
+          flight, eg. 12 (default: 24)</td>
+        <td style="width:260px">/getFlights/APT?to48</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>updatedSince</strong></td>
+        <td style="width:600px">Return records that have been updated from the date, e.g. 2023-07-16T13:00:00</td>
+        <td style="width:260px">/getFlights/APT?upatedSince=2023-07-16T13:00:00</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>{custom field name}</strong></td>
+        <td style="width:600px">Return records have the specified custom field name equal to the specified value</td>
+        <td style="width:260px">/getFlights/APT?Sh--_GroundHandler=EAS</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>&nbsp;</p>
+  <p><span style="font-size:16px"><span style="font-family:Courier New,Courier,monospace"><strong>Examples</strong></p>
+
+  Find the flights allocated from now until 12 hours from now<br />
+  <strong>/getFlights/APT?from=0&amp;to=12</strong><br />
+  <br />
+  Find the Qantas flights allocated from now until 12 hours from now<br />
+  <strong>/getFlights/APT?al=QF&amp;from=0&amp;to=12</strong><br />
+  <br />
+  Find the flights arriving from Melbourne<br />
+  <strong>/getFlights/APT?route=MEL&amp;d=Arr</strong><br />
+  <br />
+  Find all the flight where the custom field name <strong>Sh--_GroundHandler</strong> of the assigned flight is
+  EAS<br />
+  <strong>/getFlights/APT?Sh--_GroundHandler=EAS</strong><br />
+  <p>&nbsp;</p>
+
+  <p><span style="font-size:20px"><strong>/getResources/[Airport]?{options}</strong></span></p>
+  <p>Retreive flights allocated to resources</p>
+
+  <table border="1" cellpadding="1" cellspacing="1" style="width:1050px">
+    <tbody>
+      <tr>
+        <td style="width:190px"><span style="font-size:18px"><strong>Option</strong></span></td>
+        <td style="width:600px"><span style="font-size:18px"><strong>Description</strong></span></td>
+        <td style="width:260px"><span style="font-size:18px"><strong>Example</strong></span></td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>Airport</strong></td>
+        <td style="width:600px">Three letter IATA airport code to the desired airport</td>
+        <td style="width:260px">/getResources/APT</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>flt or flight</strong></td>
+        <td style="width:600px">Flight Number, eg. QF001, EK23, BA007 (default: all flights)</td>
+        <td style="width:260px">/getResources/APT?flt=QF001</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>al or airline</strong></td>
+        <td style="width:600px">Two letter IATA code for the airline, eg. BA, DL, LH, MH (default: all airlines)</td>
+        <td style="width:260px">/getResources/APT?flt=QF</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>rt or resourceType</strong></td>
+        <td style="width:600px">One of CheckIn, Gate, Stand, Carousel, Chute. (default: all types are returned)</td>
+        <td style="width:260px">/getResources/APT?rt=Gate</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>id or resource</strong></td>
+        <td style="width:600px">The name of the individual reource to query. Query must include the resourceType
+          parameter (default: all resources)</td>
+        <td style="width:260px">/getResources/APT?rt=Gate&amp;id=100</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>from</strong></td>
+        <td style="width:600px">Number of hours relative to 'now' to start looking for allocations, eg. -3 (default:
+          -12)</td>
+        <td style="width:260px">getResources/APT?from=-12</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>to</strong></td>
+        <td style="width:600px">Number of hours relative to 'now' to stop looking for allocations, eg. 12 (default: 24
+        </td>
+        <td style="width:260px">getResources/APT?to=72</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>updatedSince</strong></td>
+        <td style="width:600px">Return records that have been updated from the date, e.g. 2023-07-16T13:00:00</td>
+        <td style="width:260px">getResources/APT?upatedSince=2023-07-16T13:00:00</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>&nbsp;</p>
+
+  <p><span style="font-size:16px"><span style="font-family:Courier New,Courier,monospace"><strong>Examples</strong></p>
+
+  <p>Find the flights allocated to checkin desk 100 from now until 12 hours from now<br />
+    <strong>/getResources/APT?from=0&amp;to=12&amp;rt=CheckIn&amp;id=100</strong><br />
+    <br />
+    Find all the resources allocated to flight QF100<br />
+    <strong>/getResources/APT?flt=QF100</strong><br />
+    <br />
+    Find all the resources allocated to Emirates (EK)<br />
+    <strong>/getResources/APT?al=EK</strong><br />
+    <br />
+    Find all the resources allocated to British Airways (BA) for the next 3 days<br />
+    <strong>/getResources/APT?al=BA&amp;from=0&amp;to=72</strong><br />
+    <br />
+    Find all the resources where the custom field name <strong>Sh--_GroundHandler</strong> of the assigned flight is
+    EAS<br />
+    <strong>/getResources/APT?Sh--_GroundHandler=EAS</strong>
+  </p>
+
+  <p>&nbsp;</p>
+
+  <p><span style="font-size:20px"><strong>/getConfiguredResources/[Airport]/{ResourceType}</strong></span></p>
+  <p>Retreive the configured resources for the airport</p>
+
+  <table border="1" cellpadding="1" cellspacing="1" style="width:1050px">
+    <tbody>
+      <tr>
+        <td style="width:190px"><span style="font-size:18px"><strong>Option</strong></span></td>
+        <td style="width:600px"><span style="font-size:18px"><strong>Description</strong></span></td>
+        <td style="width:260px"><span style="font-size:18px"><strong>Example</strong></span></td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>Airport</strong></td>
+        <td style="width:600px">Three letter IATA airport code to the desired airport</td>
+        <td style="width:260px">/getConfiguredResources/APT</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>{Resource Type}</strong></td>
+        <td style="width:600px">One of CheckIn, Gate, Stand, Carousel, Chute. (default: all types are returned)</td>
+        <td style="width:260px">/getConfiguredResources/APT/Gate</td>
+      </tr>
+    </tbody>
+  </table>
+</body>
+
+</html>
