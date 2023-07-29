@@ -112,14 +112,15 @@ func main() {
 		return
 	}
 
-	if len(os.Args) < 2 {
-		usage("no command specified")
+	cmd := ""
+	if len(os.Args) >= 2 {
+		cmd = strings.ToLower(os.Args[1])
 	}
 
-	cmd := strings.ToLower(os.Args[1])
 	switch cmd {
 	case "debug":
 		isDebug = true
+		splash()
 		runService(svcName, true)
 		return
 	case "install":
@@ -135,7 +136,9 @@ func main() {
 	case "continue":
 		err = controlService(svcName, svc.Continue, svc.Running)
 	default:
+		splash()
 		usage(fmt.Sprintf("invalid command %s", cmd))
+		os.Exit(2)
 	}
 	if err != nil {
 		log.Fatalf("failed to %s %s: %v", cmd, svcName, err)
@@ -145,14 +148,29 @@ func main() {
 
 func usage(errmsg string) {
 	fmt.Fprintf(os.Stderr,
-		"%s\n\n"+
-			"usage: %s <command>\n"+
+		"usage: %s <command>\n"+
 			"       where <command> is one of\n"+
 			"       install, remove, debug, start, stop, pause or continue.\n",
-		errmsg, os.Args[0])
-	os.Exit(2)
+		os.Args[0])
 }
 
+func splash() {
+	fmt.Println()
+	fmt.Println("*******************************************************")
+	fmt.Println("*                                                     *")
+	fmt.Println("*  AMS Flights and Resources Rest API                 *")
+	fmt.Println("*                                                     *")
+	fmt.Println("*  Responds to HTTP Get Requests for flight and       *")
+	fmt.Println("*  resources allocation information                   *")
+	fmt.Println("*                                                     *")
+	fmt.Println("*  Subscribed users can also receive scheduled push   *")
+	fmt.Println("*  notifcations and pushes on changes                 *")
+	fmt.Println("*                                                     *")
+	fmt.Println("*  See help.html for API usage                        *")
+	fmt.Println("*  See adminhelp.html for configuration usage         *")
+	fmt.Println("*                                                     *")
+	fmt.Println("*******************************************************")
+}
 func getServiceConfig() ServiceConfig {
 	ex, err := os.Executable()
 	if err != nil {

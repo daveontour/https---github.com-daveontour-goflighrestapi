@@ -198,15 +198,15 @@ func maintainRepository(airportCode string) {
 		message, err := msg.Body()
 
 		if strings.Contains(message, "FlightUpdatedNotification") {
-			updateFlightEntry(message, airportCode)
+			updateFlightEntry(message)
 			continue
 		}
 		if strings.Contains(message, "FlightCreatedNotification") {
-			createFlightEntry(message, airportCode)
+			createFlightEntry(message)
 			continue
 		}
 		if strings.Contains(message, "FlightDeletedNotification") {
-			deleteFlightEntry(message, airportCode)
+			deleteFlightEntry(message)
 			continue
 		}
 	}
@@ -299,15 +299,17 @@ func cleanRepository(from time.Time, airportCode string) {
 	}
 	logger.Info(fmt.Sprintf("Repository Cleaned for %s  Number of flights = %v", airportCode, len(remove)))
 }
-func updateFlightEntry(message string, airportCode string) {
+func updateFlightEntry(message string) {
 
-	repo := GetRepo(airportCode)
 	var envel FlightUpdatedNotificatioEnvelope
 	xml.Unmarshal([]byte(message), &envel)
 
 	flight := envel.Content.FlightUpdatedNotification.Flight
 	flight.LastUpdate = time.Now()
 	flight.Action = UpdateAction
+
+	airportCode := flight.GetIATAAirport()
+	repo := GetRepo(airportCode)
 
 	sdot := flight.GetSDO()
 
@@ -331,7 +333,7 @@ func updateFlightEntry(message string, airportCode string) {
 
 	flightUpdatedChannel <- flight
 }
-func createFlightEntry(message string, airportCode string) {
+func createFlightEntry(message string) {
 
 	var envel FlightCreatedNotificatioEnvelope
 	xml.Unmarshal([]byte(message), &envel)
@@ -340,6 +342,7 @@ func createFlightEntry(message string, airportCode string) {
 	flight.LastUpdate = time.Now()
 	flight.Action = CreateAction
 
+	airportCode := flight.GetIATAAirport()
 	sdot := flight.GetSDO()
 
 	if sdot.Before(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMin-2)) {
@@ -357,7 +360,7 @@ func createFlightEntry(message string, airportCode string) {
 	upadateAllocation(flight, airportCode)
 	flightCreatedChannel <- flight
 }
-func deleteFlightEntry(message string, airportCode string) {
+func deleteFlightEntry(message string) {
 
 	//repo := repoMap[airportCode]
 
@@ -367,6 +370,8 @@ func deleteFlightEntry(message string, airportCode string) {
 	flight := envel.Content.FlightDeletedNotification.Flight
 	flightID := flight.GetFlightID()
 	flight.Action = DeleteAction
+
+	airportCode := flight.GetIATAAirport()
 
 	repoMutex.Lock()
 	//if airportentry, ok := repoMap[repo.Airport]; ok {

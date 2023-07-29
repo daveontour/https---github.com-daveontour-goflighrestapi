@@ -30,7 +30,7 @@ func getResourceAPI(c *gin.Context) {
 
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("RestAPI request for user '%s' at %s: %s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI)) // Create the response object so we can return early if required
+	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 
@@ -272,7 +272,7 @@ func getConfiguredResources(c *gin.Context) {
 
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("RestAPI request for user '%s' at %s: %s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
+	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 	resourceType := c.Param("resourceType")

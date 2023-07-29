@@ -119,7 +119,7 @@ func startGinServer() {
 func reinit(c *gin.Context) {
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("RestAPI request for user '%s' at %s : %s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI)) // Create the response object so we can return early if required
+	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 	reInitAirport(apt)
@@ -128,7 +128,7 @@ func reinit(c *gin.Context) {
 func stopJobs(c *gin.Context) {
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("RestAPI request for user '%s' at %s: %s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI)) // Create the response object so we can return early if required
+	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 	userToken := c.Param("userToken")
@@ -140,7 +140,7 @@ func stopJobs(c *gin.Context) {
 func stopAllAptJobs(c *gin.Context) {
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("RestAPI request for user '%s' at %s: %s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI)) // Create the response object so we can return early if required
+	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 
@@ -152,7 +152,7 @@ func stopAllAptJobs(c *gin.Context) {
 func rescheduleAllAptJobs(c *gin.Context) {
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("RestAPI request for user '%s' at %s: %s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI)) // Create the response object so we can return early if required
+	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 
