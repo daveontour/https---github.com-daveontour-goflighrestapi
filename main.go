@@ -73,8 +73,8 @@ func main() {
 	if serviceConfig.LogFile != "" {
 		logger.SetOutput(&lumberjack.Logger{
 			Filename:   serviceConfig.LogFile,
-			MaxSize:    50, // megabytes
-			MaxBackups: 3,
+			MaxSize:    serviceConfig.MaxLogFileSizeInMB, // megabytes
+			MaxBackups: serviceConfig.MaxNumberLogFiles,
 			MaxAge:     28,   //days
 			Compress:   true, // disabled by default
 		})
@@ -86,8 +86,8 @@ func main() {
 	if serviceConfig.RequestLogFile != "" {
 		requestLogger.SetOutput(&lumberjack.Logger{
 			Filename:   serviceConfig.RequestLogFile,
-			MaxSize:    50, // megabytes
-			MaxBackups: 3,
+			MaxSize:    serviceConfig.MaxLogFileSizeInMB, // megabytes
+			MaxBackups: serviceConfig.MaxNumberLogFiles,
 			MaxAge:     28,   //days
 			Compress:   true, // disabled by default
 		})
@@ -158,7 +158,10 @@ func splash() {
 	fmt.Println()
 	fmt.Println("*******************************************************")
 	fmt.Println("*                                                     *")
-	fmt.Println("*  AMS Flights and Resources Rest API                 *")
+	fmt.Println("*  AMS Flights and Resources Rest API  (v2.1.0)       *")
+	fmt.Println("*                                                     *")
+	fmt.Println("*  (This is NOT official SITA Software)               *")
+	fmt.Println("*  (Community Contributed Software)                   *")
 	fmt.Println("*                                                     *")
 	fmt.Println("*  Responds to HTTP Get Requests for flight and       *")
 	fmt.Println("*  resources allocation information                   *")
@@ -170,6 +173,7 @@ func splash() {
 	fmt.Println("*  See adminhelp.html for configuration usage         *")
 	fmt.Println("*                                                     *")
 	fmt.Println("*******************************************************")
+	fmt.Println()
 }
 func getServiceConfig() ServiceConfig {
 	ex, err := os.Executable()

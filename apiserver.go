@@ -52,9 +52,17 @@ func startGinServer() {
 		c.Header("Content-Type", "text/html")
 		_, _ = c.Writer.Write(data)
 	})
+	router.GET("/adminhelp", func(c *gin.Context) {
+		data, err := os.ReadFile("./adminhelp.htm")
+		if err != nil {
+			return
+		}
+		c.Header("Content-Type", "text/html")
+		_, _ = c.Writer.Write(data)
+	})
 
 	// Start it up with the configured security mode
-	if !serviceConfig.UseHTTPS {
+	if !serviceConfig.UseHTTPS && !serviceConfig.UseHTTPSUntrusted {
 
 		err := router.Run(serviceConfig.ServiceIPPort)
 		if err != nil {
@@ -63,7 +71,7 @@ func startGinServer() {
 			os.Exit(2)
 		}
 
-	} else if serviceConfig.KeyFile != "" && serviceConfig.CertFile != "" {
+	} else if serviceConfig.UseHTTPS && serviceConfig.KeyFile != "" && serviceConfig.CertFile != "" {
 
 		server := http.Server{Addr: serviceConfig.ServiceIPPort, Handler: router}
 		err := server.ListenAndServeTLS(serviceConfig.CertFile, serviceConfig.KeyFile)
@@ -73,7 +81,13 @@ func startGinServer() {
 			os.Exit(2)
 		}
 
-	} else {
+	} else if serviceConfig.UseHTTPS && (serviceConfig.KeyFile == "" && serviceConfig.CertFile == "") {
+
+		logger.Fatal("Unable to start HTTPS server. Trusted HTTPS was configured but The keyFile or certFile were not configured")
+		wg.Done()
+		os.Exit(2)
+
+	} else if serviceConfig.UseHTTPSUntrusted {
 
 		cert := &x509.Certificate{
 			SerialNumber: big.NewInt(1658),

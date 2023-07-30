@@ -1,12 +1,12 @@
 {
     "users":[
         {
-            "username":"Default User",
-            "key":"default",
-            "allowedairports":["AUH"],
-            "allowedairlines":["WY","QF","*"],
-            "allowedcustomfields":["FlightUniqueID","Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax","S---_Terminal"],
-            "changesubscriptions":[
+            "UserName":"Default User",
+            "Key":"default",
+            "AllowedAirports":["AUH"],
+            "AllowedAirlines":["WY","QF","*"],
+            "AllowedCustomFields":["FlightUniqueID","Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax","S---_Terminal"],
+            "UserChangeSubscriptions":[
                 {
                     "Enabled":true,
                     "Airport":"AUH",
@@ -25,7 +25,7 @@
                     "UpdateFlight":true
                 }
             ],
-            "pushsubscriptions": [
+            "UserPushSubscriptions": [
                 {
                     "Enabled":false,
                     "PushOnStartUp": true,
@@ -66,21 +66,20 @@
             ]
         },
         {
-            "username":"AUH",
-            "key":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
-            "allowedairports":["AUH"],
-            "allowedairlines": ["*"],
-            "allowedcustomfields": [],
-            "queryablecustomfields": [],
-            "defaultqueryablecustomfields": [
+            "UserName":"AUH",
+            "Key":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
+            "AllowedAirports":["AUH"],
+            "AllowedAirlines": ["*"],
+            "AllowedCustomFields": [],
+            "QueryableCustomFields": [],
+            "DefaultQueryableCustomFields": [
                 {"Parameter": "Il--_DisembarkingFirstPad","Value":"1"},
                 {"Parameter":"Sh--_GroundHandler","Value":"GroundHandler"}
             ],
             "overridequeryablecustomfields": [
                 {"Parameter": "Il--_DisembarkingFirstPad","Value":"1"}
             ],
-            "defaultairline": "QF",
-            "overrideairline": "QF"                      
+            "DefaultAirline": "QF"                     
         } 
     ]
 }

@@ -3,6 +3,27 @@
 <body style="font-size:12.0pt;font-family:'Courier New'">
   <p><u><strong><span style="font-size:16px">Get Flight and Resource Allocation from AMS</strong></u></p>
 
+  <p>
+    This service exposes three API endpoints to retrieve data on flights, resource allocation and configured resources
+  </p>
+  <p>
+    /getFlights<br />
+    /getResources<br />
+    /getConfiguredResources<br />
+  </p>
+  <p>
+    The APIs are accessed via HTTP GET Requests and return data in JSON format
+  </p>
+
+  <p>
+    The HTTP Get request header should include a parameter called "token". <br />
+    The value of "token" is assigned by the system administrator to identify your user profile which defines your rights
+    and capabilities to acces the APIs<br />
+    <br />
+    If the token header is not present, you will be assigned the rights of the "default user", if one is configured by
+    the administrator
+  </p>
+
   <p><span style="font-size:20px"><strong>/getFlights/[Airport]?{options}</strong></span></p>
   <p>Retreive flight details</p>
 
@@ -11,12 +32,17 @@
       <tr>
         <td style="width:190px"><strong>Airport</strong></td>
         <td style="width:600px">Three letter IATA airport code to the desired airport</td>
-        <td style="width:260px">&nbsp;</td>
+        <td style="width:260px">/getFlights/APT</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>al or airline</strong></td>
         <td style="width:600px">Two letter IATA code for the airline, eg. BA, DL, LH, MH (default: all airlines)</td>
         <td style="width:260px">/getFlights/APT?al=QF</td>
+      </tr>
+      <tr>
+        <td style="width:190px"><strong>flt or flight</strong></td>
+        <td style="width:600px">Flight Number, eg. QF001, EK23, BA007 (default: all flights)</td>
+        <td style="width:260px">/getFlights/APT?flt=QF001</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>d or direction</strong></td>
@@ -56,10 +82,10 @@
   <p>&nbsp;</p>
   <p><span style="font-size:16px"><span style="font-family:Courier New,Courier,monospace"><strong>Examples</strong></p>
 
-  Find the flights allocated from now until 12 hours from now<br />
+  Find the flights from now until 12 hours from now<br />
   <strong>/getFlights/APT?from=0&amp;to=12</strong><br />
   <br />
-  Find the Qantas flights allocated from now until 12 hours from now<br />
+  Find the Qantas flights from now until 12 hours from now<br />
   <strong>/getFlights/APT?al=QF&amp;from=0&amp;to=12</strong><br />
   <br />
   Find the flights arriving from Melbourne<br />

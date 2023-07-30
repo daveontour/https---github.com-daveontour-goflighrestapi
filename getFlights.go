@@ -25,6 +25,10 @@ func getRequestedFlightsAPI(c *gin.Context) {
 		direction = strings.ToUpper(c.Query("d"))
 	}
 	airline := c.Query("al")
+	flt := c.Query("flt")
+	if flt == "" {
+		flt = c.Query("flight")
+	}
 	from := c.Query("from")
 	to := c.Query("to")
 	route := strings.ToUpper(c.Query("route"))
@@ -32,7 +36,7 @@ func getRequestedFlightsAPI(c *gin.Context) {
 		route = c.Query("r")
 	}
 
-	response, error := getRequestedFlightsCommon(apt, direction, airline, from, to, route, "", c, nil)
+	response, error := getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, "", c, nil)
 	c.Writer.Header().Set("Content-Type", "application/json")
 
 	if error.Err == nil {
@@ -51,10 +55,10 @@ func getRequestedFlightsSub(sub UserPushSubscription, userToken string) (Respons
 	route := strings.ToUpper(sub.Route)
 	qf := sub.QueryableCustomFields
 
-	return getRequestedFlightsCommon(apt, direction, airline, strconv.Itoa(from), strconv.Itoa(to), route, userToken, nil, qf)
+	return getRequestedFlightsCommon(apt, direction, airline, "", strconv.Itoa(from), strconv.Itoa(to), route, userToken, nil, qf)
 
 }
-func getRequestedFlightsCommon(apt, direction, airline, from, to, route, userToken string, c *gin.Context, qf []ParameterValuePair) (Response, GetFlightsError) {
+func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, userToken string, c *gin.Context, qf []ParameterValuePair) (Response, GetFlightsError) {
 
 	// Create the response object so we can return early if required
 	response := Response{}
@@ -112,7 +116,7 @@ func getRequestedFlightsCommon(apt, direction, airline, from, to, route, userTok
 	response.AirportCode = apt
 
 	// Build the request object
-	request := Request{Direction: direction, Airline: airline, From: from, To: to, UserProfile: userProfile, Route: route}
+	request := Request{Direction: direction, Airline: airline, FltNum: flt, From: from, To: to, UserProfile: userProfile, Route: route}
 
 	// Reform the request based on the user Profile and the request parameters
 	request, response = processCustomFieldQueries(request, response, c, qf)
@@ -279,6 +283,10 @@ NextFlight:
 
 		// RequestedRoute filter
 		if request.Route != "" && !strings.Contains(f.GetFlightRoute(), request.Route) {
+			continue
+		}
+
+		if request.FltNum != "" && !strings.Contains(f.GetFlightID(), request.FltNum) {
 			continue
 		}
 

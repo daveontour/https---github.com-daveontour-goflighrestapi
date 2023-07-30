@@ -8,7 +8,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -30,6 +29,16 @@ const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soa
 	  <ams6:airport>%s</ams6:airport>
 	  <!--Optional:-->
    </ams6:GetFlights>
+</soapenv:Body>
+</soapenv:Envelope>`
+
+const testNativeAPIMessage = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ams6="http://www.sita.aero/ams6-xml-api-webservice">
+<soapenv:Header/>
+<soapenv:Body>
+   <ams6:GetAirports>
+	  <!--Optional:-->
+	  <ams6:sessionToken>%sf</ams6:sessionToken>
+   </ams6:GetAirports>
 </soapenv:Body>
 </soapenv:Envelope>`
 
@@ -58,7 +67,7 @@ func InitRepositories() {
 	}
 
 	for _, v := range repoList {
-		initRepository(v.Airport)
+		go initRepository(v.Airport)
 	}
 }
 
@@ -85,11 +94,17 @@ func reInitAirport(aptCode string) {
 		s.Clear()
 	}
 
-	initRepository(aptCode)
+	go initRepository(aptCode)
 
 }
 
 func initRepository(airportCode string) {
+
+	//Make sure the required services are available
+	for !testNativeAPI(airportCode) || !testRestAPIConnectivity(airportCode) {
+		logger.Warn(fmt.Sprintf("AMS Webservice API or AMS RestAPI not avaiable for %s. Will try again in 8 seconds", airportCode))
+		time.Sleep(8 * time.Second)
+	}
 
 	// Purge the listening queue first before doing the Initializarion of the repository
 	opts := []msmq.QueueInfoOption{
@@ -123,10 +138,9 @@ func initRepository(airportCode string) {
 
 func populateResourceMaps(airportCode string) {
 
-	logger.Info("Populating Resource Maps")
+	logger.Info(fmt.Sprintf("Populating Resource Maps for %s", airportCode))
 	// Retrieve the available resources
 
-	logger.Info("Populating Checkin Map")
 	var checkIns FixedResources
 	xml.Unmarshal(getResource(airportCode, "CheckIns"), &checkIns)
 	addResourcesToMap(checkIns.Values, GetRepo(airportCode).CheckInAllocationMap)
@@ -146,6 +160,8 @@ func populateResourceMaps(airportCode string) {
 	var chutes FixedResources
 	xml.Unmarshal(getResource(airportCode, "Chutes"), &chutes)
 	addResourcesToMap(chutes.Values, GetRepo(airportCode).ChuteAllocationMap)
+
+	logger.Info(fmt.Sprintf("Completed Populating Resource Maps for %s", airportCode))
 }
 
 func addResourcesToMap(resources []FixedResource, mapp map[string]ResourceAllocationMap) map[string]ResourceAllocationMap {
@@ -157,6 +173,7 @@ func addResourcesToMap(resources []FixedResource, mapp map[string]ResourceAlloca
 			FlightAllocationsMap: make(map[string]AllocationItem),
 		}
 
+		//Only add it to the map if it doesn't already exist
 		if _, ok := mapp[c.Name]; !ok {
 			mapp[c.Name] = r
 		}
@@ -243,6 +260,11 @@ func loadRepositoryOnStartup(airportCode string) {
 }
 
 func updateRepository(airportCode string) {
+
+	// Update the resource map. New entries will be added, existing entries will be left untouched
+	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s. Updating Resource Map - Starting", airportCode))
+	populateResourceMaps(airportCode)
+	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s. Updating Resource Map - Complete", airportCode))
 
 	repo := GetRepo(airportCode)
 	chunkSize := repo.ChunkSize
@@ -549,6 +571,8 @@ func deleteAllocation(flight Flight, airportCode string) {
 
 	mapMutex.Unlock()
 }
+
+// Retrieve resources from AMS
 func getResource(airportCode string, resourceType string) []byte {
 
 	repo := GetRepo(airportCode)
@@ -557,23 +581,77 @@ func getResource(airportCode string, resourceType string) []byte {
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
-		logger.Error(fmt.Sprintf("client: could not create request: %s\n", err))
-		os.Exit(1)
+		logger.Error(fmt.Sprintf("Get Resource Client: Could not create request: %s\n", err))
+		return nil
 	}
 
 	req.Header.Set("Authorization", repo.Token)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
-		logger.Error(fmt.Sprintf("client: error making http request: %s\n", err))
-		os.Exit(1)
+		logger.Error(fmt.Sprintf("Get Resource Client: error making http request: %s\n", err))
+		return nil
 	}
 
 	resBody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		logger.Error(fmt.Sprintf("client: could not read response body: %s\n", err))
-		os.Exit(1)
+		logger.Error(fmt.Sprintf("Get Resource Client: could not read response body: %s\n", err))
+		return nil
 	}
 
 	return resBody
+}
+
+func testNativeAPI(airportCode string) bool {
+
+	repo := GetRepo(airportCode)
+
+	queryBody := fmt.Sprintf(testNativeAPIMessage, repo.Token)
+	bodyReader := bytes.NewReader([]byte(queryBody))
+
+	req, err := http.NewRequest(http.MethodPost, repo.URL, bodyReader)
+	if err != nil {
+		logger.Error(fmt.Sprintf("Native API Test Client: could not create request: %s\n", err))
+		return false
+	}
+
+	req.Header.Set("Content-Type", "text/xml;charset=UTF-8")
+	req.Header.Add("SOAPAction", "http://www.sita.aero/ams6-xml-api-webservice/IAMSIntegrationService/GetAirports")
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode != 200 {
+		logger.Error(fmt.Sprintf("Native API Test Client: error making http request: %s\n", err))
+		return false
+	}
+
+	return true
+
+}
+
+func testRestAPIConnectivity(airportCode string) bool {
+	repo := GetRepo(airportCode)
+
+	url := repo.RestURL + "/" + repo.Airport + "/Gates"
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		logger.Error(fmt.Sprintf("Test Connectivity Client: Could not create request: %s\n", err))
+		return false
+	}
+
+	req.Header.Set("Authorization", repo.Token)
+
+	res, err := http.DefaultClient.Do(req)
+	if err != nil || res.StatusCode != 200 {
+		logger.Error(fmt.Sprintf("Test Connectivity Client: error making http request: %s\n", err))
+		return false
+	}
+
+	_, err = ioutil.ReadAll(res.Body)
+	if err != nil {
+		logger.Error(fmt.Sprintf("Test Connectivity Client: could not read response body: %s\n", err))
+		return false
+	}
+
+	return true
 }

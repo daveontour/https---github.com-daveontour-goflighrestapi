@@ -35,50 +35,6 @@ type AllocationResponseItem struct {
 	AllocationItem
 }
 
-func (d AllocationResponseItem) MarshalJSON() ([]byte, error) {
-
-	var sb strings.Builder
-	sb.WriteString("{")
-
-	st, _ := json.Marshal(d.ResourceType)
-	sb.WriteString(fmt.Sprintf("\"ResourceType\":%s,", string(st)))
-	st2, _ := json.Marshal(d.Name)
-	sb.WriteString(fmt.Sprintf("\"Name\":%s,", string(st2)))
-	st3, _ := json.Marshal(d.Area)
-	sb.WriteString(fmt.Sprintf("\"Area\":%s,", string(st3)))
-
-	st4, _ := json.Marshal(d.AllocationItem.From)
-	sb.WriteString(fmt.Sprintf("\"AllocationStart\":%s,", string(st4)))
-	st5, _ := json.Marshal(d.AllocationItem.To)
-	sb.WriteString(fmt.Sprintf("\"AllocationEnd\":%s,", string(st5)))
-
-	sb.WriteString("\"Flight\": {")
-
-	f1, _ := json.Marshal(d.AllocationItem.FlightID)
-	sb.WriteString(fmt.Sprintf("\"FlightID\":%s,", string(f1)))
-
-	f2, _ := json.Marshal(d.AllocationItem.Direction)
-	sb.WriteString(fmt.Sprintf("\"Direction\":%s,", string(f2)))
-
-	f3, _ := json.Marshal(d.AllocationItem.Route)
-	sb.WriteString(fmt.Sprintf("\"Route\":%s,", string(f3)))
-
-	if d.AllocationItem.AircraftRegistration != "" {
-		f4, _ := json.Marshal(d.AllocationItem.AircraftRegistration)
-		sb.WriteString(fmt.Sprintf("\"AircraftRegistration\":%s,", string(f4)))
-	}
-
-	if d.AllocationItem.AircraftType != "" {
-		f5, _ := json.Marshal(d.AllocationItem.AircraftType)
-		sb.WriteString(fmt.Sprintf("\"AircraftType\":%s", string(f5)))
-	}
-	sb.WriteString(" },")
-
-	s := CleanJSON(sb)
-
-	return []byte(s), nil
-}
-
 type ConfiguredResourceResponseItem struct {
 	ResourceTypeCode string `xml:"ResourceTypeCode"`
 	Name             string `xml:"Name"`
@@ -100,31 +56,34 @@ type PropertyValuePair struct {
 }
 
 type ServiceConfig struct {
-	ServiceName                      string `json:"servicename"`
-	ServicDisplayName                string `json:"servicedisplayname"`
-	ServiceDescription               string `json:"servicedescription"`
-	ServiceIPPort                    string `json:"serviceipport"`
-	ScheduleUpdateJob                string `json:"scheduleUpdateJob"`
-	ScheduleUpdateJobIntervalInHours int    `json:"scheduleUpdateJobIntervalInHours"`
-	DebugService                     bool   `json:"debugService"`
-	UseHTTPS                         bool   `json:"useHTTPS"`
-	KeyFile                          string `json:"keyFile"`
-	CertFile                         string `json:"certFile"`
-	TestHTTPServer                   bool   `json:"testHTTPServer"`
-	LogFile                          string `json:"logFile"`
-	RequestLogFile                   string `json:"requestlogFile"`
+	ServiceName                      string `json:"ServiceName"`
+	ServicDisplayName                string `json:"ServiceDisplayName"`
+	ServiceDescription               string `json:"ServiceDescription"`
+	ServiceIPPort                    string `json:"ServiceIPport"`
+	ScheduleUpdateJob                string `json:"ScheduleUpdateJob"`
+	ScheduleUpdateJobIntervalInHours int    `json:"ScheduleUpdateJobIntervalInHours"`
+	DebugService                     bool   `json:"DebugService"`
+	UseHTTPS                         bool   `json:"UseHTTPS"`
+	UseHTTPSUntrusted                bool   `json:"UseHTTPSUntrusted"`
+	KeyFile                          string `json:"KeyFile"`
+	CertFile                         string `json:"CertFile"`
+	TestHTTPServer                   bool   `json:"TestHTTPServer"`
+	LogFile                          string `json:"LogFile"`
+	RequestLogFile                   string `json:"RequestLogFile"`
+	MaxLogFileSizeInMB               int    `json:"MaxLogFileSizeInMB"`
+	MaxNumberLogFiles                int    `json:"MaxNumberLogFiles"`
 }
 
 type UserProfile struct {
-	UserName                     string                   `json:"username"`
-	Key                          string                   `json:"key"`
-	AllowedAirports              []string                 `json:"allowedairports"`
-	AllowedAirlines              []string                 `json:"allowedairlines"`
-	AllowedCustomFields          []string                 `json:"allowedcustomfields"`
-	DefaultAirline               string                   `json:"defaultairline"`
-	DefaultQueryableCustomFields []ParameterValuePair     `json:"defaultqueryablecustomfields"`
-	UserPushSubscriptions        []UserPushSubscription   `json:"pushsubscriptions"`
-	UserChangeSubscriptions      []UserChangeSubscription `json:"changesubscriptions"`
+	UserName                     string                   `json:"UserName"`
+	Key                          string                   `json:"Key"`
+	AllowedAirports              []string                 `json:"AllowedAirports"`
+	AllowedAirlines              []string                 `json:"AllowedAirlines"`
+	AllowedCustomFields          []string                 `json:"AllowedCustomFields"`
+	DefaultAirline               string                   `json:"DefaultAirline"`
+	DefaultQueryableCustomFields []ParameterValuePair     `json:"DefaultQueryableCustomFields"`
+	UserPushSubscriptions        []UserPushSubscription   `json:"UserPushSubscriptions"`
+	UserChangeSubscriptions      []UserChangeSubscription `json:"UserChangeSubscriptions"`
 }
 
 type UserPushSubscription struct {
@@ -170,15 +129,15 @@ type Users struct {
 }
 
 type Repository struct {
-	Airport               string `json:"airport"`
-	URL                   string `json:"url"`
-	RestURL               string `json:"resturl"`
-	Token                 string `json:"token"`
-	WindowMin             int    `json:"windowminimum"`
-	WindowMax             int    `json:"windowmaximum"`
-	ListenerType          string `json:"listenertype"`
-	ListenerQueue         string `json:"listenerqueue"`
-	ChunkSize             int    `json:"chunksize"`
+	Airport               string `json:"Airport"`
+	URL                   string `json:"Url"`
+	RestURL               string `json:"RestUrl"`
+	Token                 string `json:"Token"`
+	WindowMin             int    `json:"WindowMinimum"`
+	WindowMax             int    `json:"WindowMaximum"`
+	ListenerType          string `json:"ListenerType"`
+	ListenerQueue         string `json:"ListenerQueue"`
+	ChunkSize             int    `json:"ChunkSize"`
 	Flights               map[string]Flight
 	CurrentLowerLimit     time.Time
 	CurrentUpperLimit     time.Time
@@ -189,15 +148,19 @@ type Repository struct {
 	ChuteAllocationMap    map[string]ResourceAllocationMap
 }
 
-func (r *Repository) updateLowerLimit(t time.Time) {
-	r.CurrentLowerLimit = t
-}
-func (r *Repository) updateUpperLimit(t time.Time) {
-	r.CurrentUpperLimit = t
-}
-
 type Repositories struct {
 	Repositories []Repository `json:"airports"`
+}
+type Request struct {
+	Direction                  string
+	Airline                    string
+	FltNum                     string
+	From                       string
+	To                         string
+	UpdatedSince               string
+	Route                      string
+	UserProfile                UserProfile
+	PresentQueryableParameters []ParameterValuePair
 }
 type Response struct {
 	User             string               `json:"User,omitempty"`
@@ -235,20 +198,58 @@ type ResourceResponse struct {
 	ConfiguredResources []ConfiguredResourceResponseItem `json:"ConfiguredResources,omitempty"`
 }
 
+func (r *Repository) updateLowerLimit(t time.Time) {
+	r.CurrentLowerLimit = t
+}
+func (r *Repository) updateUpperLimit(t time.Time) {
+	r.CurrentUpperLimit = t
+}
 func (r *Response) AddWarning(w string) {
 	r.Warnings = append(r.Warnings, w)
 }
 func (r *Response) AddError(w string) {
 	r.Errors = append(r.Errors, w)
 }
+func (d AllocationResponseItem) MarshalJSON() ([]byte, error) {
 
-type Request struct {
-	Direction                  string
-	Airline                    string
-	From                       string
-	To                         string
-	UpdatedSince               string
-	Route                      string
-	UserProfile                UserProfile
-	PresentQueryableParameters []ParameterValuePair
+	var sb strings.Builder
+	sb.WriteString("{")
+
+	st, _ := json.Marshal(d.ResourceType)
+	sb.WriteString(fmt.Sprintf("\"ResourceType\":%s,", string(st)))
+	st2, _ := json.Marshal(d.Name)
+	sb.WriteString(fmt.Sprintf("\"Name\":%s,", string(st2)))
+	st3, _ := json.Marshal(d.Area)
+	sb.WriteString(fmt.Sprintf("\"Area\":%s,", string(st3)))
+
+	st4, _ := json.Marshal(d.AllocationItem.From)
+	sb.WriteString(fmt.Sprintf("\"AllocationStart\":%s,", string(st4)))
+	st5, _ := json.Marshal(d.AllocationItem.To)
+	sb.WriteString(fmt.Sprintf("\"AllocationEnd\":%s,", string(st5)))
+
+	sb.WriteString("\"Flight\": {")
+
+	f1, _ := json.Marshal(d.AllocationItem.FlightID)
+	sb.WriteString(fmt.Sprintf("\"FlightID\":%s,", string(f1)))
+
+	f2, _ := json.Marshal(d.AllocationItem.Direction)
+	sb.WriteString(fmt.Sprintf("\"Direction\":%s,", string(f2)))
+
+	f3, _ := json.Marshal(d.AllocationItem.Route)
+	sb.WriteString(fmt.Sprintf("\"Route\":%s,", string(f3)))
+
+	if d.AllocationItem.AircraftRegistration != "" {
+		f4, _ := json.Marshal(d.AllocationItem.AircraftRegistration)
+		sb.WriteString(fmt.Sprintf("\"AircraftRegistration\":%s,", string(f4)))
+	}
+
+	if d.AllocationItem.AircraftType != "" {
+		f5, _ := json.Marshal(d.AllocationItem.AircraftType)
+		sb.WriteString(fmt.Sprintf("\"AircraftType\":%s", string(f5)))
+	}
+	sb.WriteString(" },")
+
+	s := CleanJSON(sb)
+
+	return []byte(s), nil
 }

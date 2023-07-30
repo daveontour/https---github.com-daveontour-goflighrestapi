@@ -1,14 +1,14 @@
 {
     "airports":[
         {
-            "airport":"AUH",
-            "token":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
-            "url":"http://localhost/SITAAMSIntegrationService/v2/SITAAMSIntegrationService",
-            "resturl": "http://localhost/api/v1/",
-            "windowminimum": -3,
-            "windowmaximum": 20,
-            "listenerqueue": ".\\private$\\tow_tracker",
-            "chunksize":4
+            "Airport":"AUH",
+            "Token":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
+            "Url":"http://localhost/SITAAMSIntegrationService/v2/SITAAMSIntegrationService",
+            "RestUrl": "http://localhost/api/v1/",
+            "WindowMinimum": -3,
+            "WindowMaximum": 20,
+            "ListenerQueue": ".\\private$\\tow_tracker",
+            "ChunkSize":4
         } 
     ]
 }
