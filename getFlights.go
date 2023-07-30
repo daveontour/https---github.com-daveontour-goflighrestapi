@@ -14,6 +14,7 @@ import (
 
 func getRequestedFlightsAPI(c *gin.Context) {
 
+	defer exeTime("GetFlightRequest")()
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
 
@@ -133,6 +134,7 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	}
 
 	var err error
+
 	// Get the filtered and pruned flights for the request
 	response, err = filterFlights(request, response, GetRepo(apt).Flights, c)
 
@@ -207,6 +209,7 @@ func processCustomFieldQueries(request Request, response Response, c *gin.Contex
 }
 func filterFlights(request Request, response Response, flights map[string]Flight, c *gin.Context) (Response, error) {
 
+	defer exeTime("FilterFlights")()
 	returnFlights := []Flight{}
 
 	// var from time.Time
@@ -308,11 +311,13 @@ NextFlight:
 
 		// Made it here without being filtered out, so add it to the flights to be returned. The "prune"
 		// function removed any message elements that the user is not allowed to see
-		returnFlights = append(returnFlights, prune(f, request))
+		returnFlights = append(returnFlights, f)
 	}
 
+	returnFlights = prune(returnFlights, request)
 	mapMutex.Unlock()
 
+	defer exeTime("SortingFilterFlights")()
 	sort.Slice(returnFlights, func(i, j int) bool {
 		return returnFlights[i].GetSTO().Before(returnFlights[j].GetSTO())
 	})
@@ -325,40 +330,90 @@ NextFlight:
 }
 
 // Creates a copy of the flight record with the custom fields that the user is allowed to see
-func prune(flight Flight, request Request) (flDup Flight) {
+func prune(flights []Flight, request Request) (flDups []Flight) {
 
-	flDup = flight.DuplicateFlight()
-	flDup.FlightState.Value = []Value{}
+	defer exeTime("PruningFilterdFlight")()
 
-	// If Allowed CustomFields is not nil, then filter the custome fields
-	// if "*" in list then it is all custom fields
-	// Extra safety, if the parameter is not defined, then no results returned
+	for _, flight := range flights {
 
-	if request.UserProfile.AllowedCustomFields != nil {
-		if contains(request.UserProfile.AllowedCustomFields, "*") {
-			flDup.FlightState.Value = flight.FlightState.Value
-		} else {
-			for _, property := range request.UserProfile.AllowedCustomFields {
-				data := flight.GetProperty(property)
+		//	flDup := flight.DuplicateFlight()
 
-				if data != "" {
-					flDup.FlightState.Value = append(flDup.FlightState.Value, Value{property, data})
+		//Go creates a copy with the below assignment
+		flDup := flight
+		flDup.FlightState.Value = []Value{}
+
+		// If Allowed CustomFields is not nil, then filter the custome fields
+		// if "*" in list then it is all custom fields
+		// Extra safety, if the parameter is not defined, then no results returned
+
+		if request.UserProfile.AllowedCustomFields != nil {
+			if contains(request.UserProfile.AllowedCustomFields, "*") {
+				flDup.FlightState.Value = flight.FlightState.Value
+			} else {
+				for _, property := range request.UserProfile.AllowedCustomFields {
+					data := flight.GetProperty(property)
+
+					if data != "" {
+						flDup.FlightState.Value = append(flDup.FlightState.Value, Value{property, data})
+					}
 				}
 			}
 		}
-	}
 
-	changes := []Change{}
+		changes := []Change{}
 
-	for ii := 0; ii < len(flDup.FlightChanges.Changes); ii++ {
-		ok := contains(request.UserProfile.AllowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
-		ok = ok || request.UserProfile.AllowedCustomFields == nil
-		if ok {
-			changes = append(changes, flDup.FlightChanges.Changes[ii])
+		for ii := 0; ii < len(flDup.FlightChanges.Changes); ii++ {
+			ok := contains(request.UserProfile.AllowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
+			ok = ok || request.UserProfile.AllowedCustomFields == nil
+			if ok {
+				changes = append(changes, flDup.FlightChanges.Changes[ii])
+			}
 		}
-	}
 
-	flDup.FlightChanges.Changes = changes
+		flDup.FlightChanges.Changes = changes
+
+		flDups = append(flDups, flDup)
+	}
 
 	return
 }
+
+// // Creates a copy of the flight record with the custom fields that the user is allowed to see
+// func prune(flight Flight, request Request) (flDup Flight) {
+
+// 	defer exeTime("PruningFilterdFlight")()
+// 	flDup = flight.DuplicateFlight()
+// 	flDup.FlightState.Value = []Value{}
+
+// 	// If Allowed CustomFields is not nil, then filter the custome fields
+// 	// if "*" in list then it is all custom fields
+// 	// Extra safety, if the parameter is not defined, then no results returned
+
+// 	if request.UserProfile.AllowedCustomFields != nil {
+// 		if contains(request.UserProfile.AllowedCustomFields, "*") {
+// 			flDup.FlightState.Value = flight.FlightState.Value
+// 		} else {
+// 			for _, property := range request.UserProfile.AllowedCustomFields {
+// 				data := flight.GetProperty(property)
+
+// 				if data != "" {
+// 					flDup.FlightState.Value = append(flDup.FlightState.Value, Value{property, data})
+// 				}
+// 			}
+// 		}
+// 	}
+
+// 	changes := []Change{}
+
+// 	for ii := 0; ii < len(flDup.FlightChanges.Changes); ii++ {
+// 		ok := contains(request.UserProfile.AllowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
+// 		ok = ok || request.UserProfile.AllowedCustomFields == nil
+// 		if ok {
+// 			changes = append(changes, flDup.FlightChanges.Changes[ii])
+// 		}
+// 	}
+
+// 	flDup.FlightChanges.Changes = changes
+
+// 	return
+// }

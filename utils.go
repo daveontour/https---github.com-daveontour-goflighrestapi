@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func contains(elems []string, v string) bool {
@@ -114,4 +115,11 @@ func exePath() (string, error) {
 		}
 	}
 	return "", err
+}
+
+func exeTime(name string) func() {
+	start := time.Now()
+	return func() {
+		fmt.Printf("%s execution time: %v\n", name, time.Since(start))
+	}
 }

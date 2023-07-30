@@ -28,6 +28,7 @@ func getResourceSub(sub UserPushSubscription, userToken string) (ResourceRespons
 
 func getResourceAPI(c *gin.Context) {
 
+	defer exeTime("GetResourcesRequest")()
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
 	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
@@ -99,7 +100,7 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 		response.Airline = "All Airlines"
 	}
 
-	if resourceType != "" && !strings.Contains("Checkin Gate Stand Carousel Chute", resourceType) {
+	if resourceType != "" && !strings.Contains(strings.ToLower("Checkin Gate Stand Carousel Chute"), strings.ToLower(resourceType)) {
 		return response, GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("Invalid resouce type specified."),
@@ -287,7 +288,7 @@ func getConfiguredResources(c *gin.Context) {
 		response.ResourceType = "All Resources"
 	}
 
-	if resourceType != "" && !strings.Contains("Checkin Gate Stand Carousel Chute", resourceType) {
+	if resourceType != "" && !strings.Contains(strings.ToLower("Checkin Gate Stand Carousel Chute"), strings.ToLower(resourceType)) {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid resouce type specified. "})
 		return
 	}

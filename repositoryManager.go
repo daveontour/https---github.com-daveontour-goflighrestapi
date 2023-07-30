@@ -101,7 +101,7 @@ func reInitAirport(aptCode string) {
 func initRepository(airportCode string) {
 
 	//Make sure the required services are available
-	for !testNativeAPI(airportCode) || !testRestAPIConnectivity(airportCode) {
+	for !testNativeAPIConnectivity(airportCode) || !testRestAPIConnectivity(airportCode) {
 		logger.Warn(fmt.Sprintf("AMS Webservice API or AMS RestAPI not avaiable for %s. Will try again in 8 seconds", airportCode))
 		time.Sleep(8 * time.Second)
 	}
@@ -602,7 +602,7 @@ func getResource(airportCode string, resourceType string) []byte {
 	return resBody
 }
 
-func testNativeAPI(airportCode string) bool {
+func testNativeAPIConnectivity(airportCode string) bool {
 
 	repo := GetRepo(airportCode)
 
@@ -625,7 +625,6 @@ func testNativeAPI(airportCode string) bool {
 	}
 
 	return true
-
 }
 
 func testRestAPIConnectivity(airportCode string) bool {
