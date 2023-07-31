@@ -100,6 +100,8 @@ func reInitAirport(aptCode string) {
 
 func initRepository(airportCode string) {
 
+	defer exeTime(fmt.Sprintf("Initialising Repository for %s", airportCode))()
+
 	//Make sure the required services are available
 	for !testNativeAPIConnectivity(airportCode) || !testRestAPIConnectivity(airportCode) {
 		logger.Warn(fmt.Sprintf("AMS Webservice API or AMS RestAPI not avaiable for %s. Will try again in 8 seconds", airportCode))
@@ -261,6 +263,7 @@ func loadRepositoryOnStartup(airportCode string) {
 
 func updateRepository(airportCode string) {
 
+	defer exeTime(fmt.Sprintf("Updated Repository for %s", airportCode))()
 	// Update the resource map. New entries will be added, existing entries will be left untouched
 	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s. Updating Resource Map - Starting", airportCode))
 	populateResourceMaps(airportCode)
@@ -347,7 +350,6 @@ func updateFlightEntry(message string) {
 	flightID := flight.GetFlightID()
 
 	repoMutex.Lock()
-
 	GetRepo(airportCode).Flights[flightID] = flight
 	repoMutex.Unlock()
 
@@ -446,6 +448,9 @@ func getFlights(airportCode string, values ...int) []byte {
 	return resBody
 }
 func upadateAllocation(flight Flight, airportCode string) {
+
+	//defer exeTime(fmt.Sprintf("Updated allocations for Flight %s", flight.GetFlightID()))()
+	// Testing with 3000 flights showed unmeasurable time to 500 micro seconds, so no worries mate
 
 	repo := GetRepo(airportCode)
 	// It's too messy to do CRUD operations, so just delete all the allocations and then create them again from the current message

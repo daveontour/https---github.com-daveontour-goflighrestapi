@@ -14,7 +14,7 @@ import (
 
 func getRequestedFlightsAPI(c *gin.Context) {
 
-	defer exeTime("GetFlightRequest")()
+	defer exeTime(fmt.Sprintf("Get Flight Processing time for %s", c.Request.RequestURI))()
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
 
@@ -209,7 +209,7 @@ func processCustomFieldQueries(request Request, response Response, c *gin.Contex
 }
 func filterFlights(request Request, response Response, flights map[string]Flight, c *gin.Context) (Response, error) {
 
-	defer exeTime("FilterFlights")()
+	//defer exeTime("Filter, Prune and Sort Flights")()
 	returnFlights := []Flight{}
 
 	// var from time.Time
@@ -251,6 +251,7 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 
 	mapMutex.Lock()
 
+	filterStart := time.Now()
 NextFlight:
 	for _, f := range flights {
 
@@ -314,16 +315,20 @@ NextFlight:
 		returnFlights = append(returnFlights, f)
 	}
 
+	metricsLogger.Info(fmt.Sprintf("Filter Flights execution time: %s", time.Since(filterStart)))
+
 	returnFlights = prune(returnFlights, request)
 	mapMutex.Unlock()
 
-	defer exeTime("SortingFilterFlights")()
+	response.NumberOfFlights = len(returnFlights)
+
+	defer exeTime(fmt.Sprintf("Sorting %v Filtered Flights", response.NumberOfFlights))()
 	sort.Slice(returnFlights, func(i, j int) bool {
 		return returnFlights[i].GetSTO().Before(returnFlights[j].GetSTO())
 	})
 
 	response.Flights = returnFlights
-	response.NumberOfFlights = len(returnFlights)
+
 	response.CustomFieldQuery = request.PresentQueryableParameters
 
 	return response, nil
@@ -332,7 +337,7 @@ NextFlight:
 // Creates a copy of the flight record with the custom fields that the user is allowed to see
 func prune(flights []Flight, request Request) (flDups []Flight) {
 
-	defer exeTime("PruningFilterdFlight")()
+	defer exeTime(fmt.Sprintf("Pruning %v Filtered Flights", len(flights)))()
 
 	for _, flight := range flights {
 
@@ -340,6 +345,8 @@ func prune(flights []Flight, request Request) (flDups []Flight) {
 
 		//Go creates a copy with the below assignment
 		flDup := flight
+
+		// Clear all the Custom Field Parameters
 		flDup.FlightState.Value = []Value{}
 
 		// If Allowed CustomFields is not nil, then filter the custome fields

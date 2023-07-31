@@ -14,5 +14,7 @@
     "LogFile": "c:/Users/dave_/Desktop/FLIGHTRESOURCERestAPI.log",
     "RequestLogFile": "c:/Users/dave_/Desktop/RequestRestAPI.log",
     "MaxLogFileSizeInMB":50,
-    "MaxNumberLogFiles": 3
+    "MaxNumberLogFiles": 3,
+    "EnableMetrics": true,
+    "MetricsLogFile":"c:/Users/dave_/Desktop/metrics.log"
 }

@@ -22,13 +22,14 @@ func getResourceSub(sub UserPushSubscription, userToken string) (ResourceRespons
 	from := sub.From
 	to := sub.To
 	updatedSince := ""
+	sortBy := "time"
 
-	return getResourcesCommon(apt, flightID, airline, resourceType, resource, strconv.Itoa(from), strconv.Itoa(to), updatedSince, userToken, nil)
+	return getResourcesCommon(apt, flightID, airline, resourceType, resource, strconv.Itoa(from), strconv.Itoa(to), updatedSince, sortBy, userToken, nil)
 }
 
 func getResourceAPI(c *gin.Context) {
 
-	defer exeTime("GetResourcesRequest")()
+	defer exeTime(fmt.Sprintf("Get Resources Request for %s", c.Request.URL))()
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
 	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
@@ -53,12 +54,16 @@ func getResourceAPI(c *gin.Context) {
 	if resource == "" {
 		resource = c.Query("id")
 	}
+	sortBy := c.Query("sort")
+	if sortBy == "" {
+		sortBy = "resource"
+	}
 
 	from := c.Query("from")
 	to := c.Query("to")
 	updatedSince := c.Query("updatedSince")
 
-	response, error := getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, "", c)
+	response, error := getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, sortBy, "", c)
 
 	// Create the response object so we can return early if required
 	c.Writer.Header().Set("Content-Type", "application/json")
@@ -71,7 +76,7 @@ func getResourceAPI(c *gin.Context) {
 
 }
 
-func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, userToken string, c *gin.Context) (ResourceResponse, GetFlightsError) {
+func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, sortBy, userToken string, c *gin.Context) (ResourceResponse, GetFlightsError) {
 
 	response := ResourceResponse{}
 	//	c.Writer.Header().Set("Content-Type", "application/json")
@@ -173,6 +178,7 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 		GetRepo(apt).ChuteAllocationMap,
 		GetRepo(apt).CarouselAllocationMap}
 
+	filterStart := time.Now()
 	for idx, allocMap := range allocMaps {
 
 		//If a resource type has been specified, ignore the rest
@@ -254,9 +260,29 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 		}
 	}
 
-	sort.Slice(alloc, func(i, j int) bool {
-		return alloc[i].From.Before(alloc[j].From)
-	})
+	metricsLogger.Info(fmt.Sprintf("Filter Resources execution time: %s", time.Since(filterStart)))
+
+	sortStart := time.Now()
+	if strings.ToLower(sortBy) == "time" {
+		sort.Slice(alloc, func(i, j int) bool {
+			return alloc[i].From.Before(alloc[j].From)
+		})
+	} else {
+		sort.Slice(alloc, func(i, j int) bool {
+			si := alloc[i].ResourceType + alloc[i].Name
+			sj := alloc[j].ResourceType + alloc[j].Name
+
+			r := strings.Compare(si, sj)
+
+			if r < 1 {
+				return true
+			} else {
+				return false
+			}
+		})
+	}
+
+	metricsLogger.Info(fmt.Sprintf("Sort Resources execution time: %s", time.Since(sortStart)))
 
 	response.Allocations = alloc
 

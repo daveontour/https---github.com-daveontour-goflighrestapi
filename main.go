@@ -38,6 +38,7 @@ var isDebug bool = false
 
 var logger = logrus.New()
 var requestLogger = logrus.New()
+var metricsLogger = logrus.New()
 
 const layout = "2006-01-02T15:04:05"
 
@@ -91,6 +92,26 @@ func main() {
 			MaxAge:     28,   //days
 			Compress:   true, // disabled by default
 		})
+	}
+
+	metricsLogger.Formatter = &easy.Formatter{
+		TimestampFormat: "2006-01-02 15:04:05.000000",
+		LogFormat:       "[%lvl%]: %time% - %msg%\n",
+	}
+	if serviceConfig.MetricsLogFile != "" {
+		metricsLogger.SetOutput(&lumberjack.Logger{
+			Filename:   serviceConfig.MetricsLogFile,
+			MaxSize:    serviceConfig.MaxLogFileSizeInMB, // megabytes
+			MaxBackups: serviceConfig.MaxNumberLogFiles,
+			MaxAge:     28,   //days
+			Compress:   true, // disabled by default
+		})
+
+	}
+	if serviceConfig.EnableMetrics {
+		metricsLogger.SetLevel(logrus.InfoLevel)
+	} else {
+		metricsLogger.SetLevel(logrus.ErrorLevel)
 	}
 
 	logger.SetLevel(logrus.InfoLevel)

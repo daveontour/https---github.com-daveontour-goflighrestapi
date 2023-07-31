@@ -120,6 +120,6 @@ func exePath() (string, error) {
 func exeTime(name string) func() {
 	start := time.Now()
 	return func() {
-		fmt.Printf("%s execution time: %v\n", name, time.Since(start))
+		metricsLogger.Info(fmt.Sprintf("%s execution time: %v", name, time.Since(start)))
 	}
 }
