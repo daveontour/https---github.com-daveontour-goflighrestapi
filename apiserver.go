@@ -36,14 +36,30 @@ func startGinServer() {
 	if serviceConfig.TestHTTPServer {
 		router.POST("/test", testQuery)
 	}
-	router.GET("/reinit/:apt", reinit)
 	router.GET("/getFlights/:apt", getRequestedFlightsAPI)
-	router.GET("/stopJobs/:apt/:userToken", stopJobs)
-	router.GET("/stopAllAptJobs/:apt", stopAllAptJobs)
-	router.GET("/rescheduleAllAptJobs/:apt", rescheduleAllAptJobs)
 	router.GET("/getResources/:apt", getResourceAPI)
 	router.GET("/getConfiguredResources/:apt/:resourceType", getConfiguredResources)
 	router.GET("/getConfiguredResources/:apt", getConfiguredResources)
+
+	router.GET("/admin/reinit/:apt", reinit)
+	router.GET("/admin/stopJobs/:apt/:userToken", stopJobs)
+	router.GET("/admin/stopAllAptJobs/:apt", stopAllAptJobs)
+	router.GET("/admin/rescheduleAllAptJobs/:apt", rescheduleAllAptJobs)
+
+	router.GET("/admin/enableMetrics", func(c *gin.Context) {
+		if hasAdminToken(c) {
+			metricsLogger.SetLevel(logrus.InfoLevel)
+		} else {
+			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		}
+	})
+	router.GET("/admin/disableMetrics", func(c *gin.Context) {
+		if hasAdminToken(c) {
+			metricsLogger.SetLevel(logrus.ErrorLevel)
+		} else {
+			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		}
+	})
 	router.GET("/help", func(c *gin.Context) {
 		data, err := os.ReadFile("./help.html")
 		if err != nil {
@@ -130,10 +146,23 @@ func startGinServer() {
 
 }
 
+func hasAdminToken(c *gin.Context) bool {
+	keys := c.Request.Header["token"]
+	if keys[0] == serviceConfig.AdminToken {
+		return true
+	} else {
+		return false
+	}
+}
+
 func reinit(c *gin.Context) {
-	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
+
+	if !hasAdminToken(c) {
+		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		return
+	} else {
+		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+	}
 
 	apt := c.Param("apt")
 	reInitAirport(apt)
@@ -141,8 +170,13 @@ func reinit(c *gin.Context) {
 
 func stopJobs(c *gin.Context) {
 	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
+
+	if !hasAdminToken(c) {
+		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		return
+	} else {
+		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+	}
 
 	apt := c.Param("apt")
 	userToken := c.Param("userToken")
@@ -152,9 +186,13 @@ func stopJobs(c *gin.Context) {
 }
 
 func stopAllAptJobs(c *gin.Context) {
-	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
+
+	if !hasAdminToken(c) {
+		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		return
+	} else {
+		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+	}
 
 	apt := c.Param("apt")
 
@@ -164,10 +202,12 @@ func stopAllAptJobs(c *gin.Context) {
 	logger.Info(fmt.Sprintf("All Aiport Jobs Stopped for %s", apt))
 }
 func rescheduleAllAptJobs(c *gin.Context) {
-	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, "")
-	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
-
+	if !hasAdminToken(c) {
+		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		return
+	} else {
+		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+	}
 	apt := c.Param("apt")
 
 	// Reload the schdule of jobs for the airport

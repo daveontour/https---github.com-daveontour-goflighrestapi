@@ -74,6 +74,7 @@ type ServiceConfig struct {
 	MaxNumberLogFiles                int    `json:"MaxNumberLogFiles"`
 	EnableMetrics                    bool   `json:"EnableMetrics"`
 	MetricsLogFile                   string `json:"MetricsLogFile"`
+	AdminToken                       string `json:"AdminToken"`
 }
 
 type UserProfile struct {

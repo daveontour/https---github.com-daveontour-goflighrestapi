@@ -16,5 +16,6 @@
     "MaxLogFileSizeInMB":50,
     "MaxNumberLogFiles": 3,
     "EnableMetrics": true,
-    "MetricsLogFile":"c:/Users/dave_/Desktop/metrics.log"
+    "MetricsLogFile":"c:/Users/dave_/Desktop/metrics.log",
+    "AdminToken":"davewashere"
 }

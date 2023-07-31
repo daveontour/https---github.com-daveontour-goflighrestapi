@@ -93,7 +93,8 @@ NextSub:
 		if sub.Airport != flt.GetIATAAirport() {
 			continue
 		}
-		if !sub.CreateFlight && flt.Action == UpdateAction {
+
+		if !sub.UpdateFlight && flt.Action == UpdateAction {
 			continue
 		}
 		if sub.CreateFlight && flt.Action == CreateAction {
@@ -103,7 +104,12 @@ NextSub:
 		if !sub.DeleteFlight && flt.Action == DeleteAction {
 			continue
 		}
+
 		if sub.DeleteFlight && flt.Action == DeleteAction {
+			go executeChangePush(sub, flt)
+			continue NextSub
+		}
+		if sub.CreateFlight && flt.Action == CreateAction {
 			go executeChangePush(sub, flt)
 			continue NextSub
 		}
