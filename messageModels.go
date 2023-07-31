@@ -90,6 +90,11 @@ type MetricsReport struct {
 	NumberOfCarouselAllocations int
 	NumberOfChutes              int
 	NumberOfChuteAllocations    int
+	MemAllocMB                  int
+	MemHeapAllocMB              int
+	MemTotaAllocMB              int
+	MemSysMB                    int
+	MemNumGC                    int
 }
 
 type UserProfile struct {
@@ -147,23 +152,23 @@ type Users struct {
 }
 
 type Repository struct {
-	Airport               string `json:"Airport"`
-	URL                   string `json:"Url"`
-	RestURL               string `json:"RestUrl"`
-	Token                 string `json:"Token"`
-	WindowMin             int    `json:"WindowMinimum"`
-	WindowMax             int    `json:"WindowMaximum"`
-	ListenerType          string `json:"ListenerType"`
-	ListenerQueue         string `json:"ListenerQueue"`
-	ChunkSize             int    `json:"ChunkSize"`
-	Flights               map[string]Flight
-	CurrentLowerLimit     time.Time
-	CurrentUpperLimit     time.Time
-	CheckInAllocationMap  map[string]ResourceAllocationMap
-	StandAllocationMap    map[string]ResourceAllocationMap
-	GateAllocationMap     map[string]ResourceAllocationMap
-	CarouselAllocationMap map[string]ResourceAllocationMap
-	ChuteAllocationMap    map[string]ResourceAllocationMap
+	AMSAirport                string `json:"AMSAirport"`
+	AMSSOAPServiceURL         string `json:"AMSSOAPServiceURL"`
+	AMSRestServiceURL         string `json:"AMSRestServiceURL"`
+	AMSToken                  string `json:"AMSToken"`
+	WindowMinInDaysFromNow    int    `json:"FlightSDOWindowMinimumInDaysFromNow"`
+	WindowMaxInDaysFromNow    int    `json:"FlightSDOWindowMaximumInDaysFromNow"`
+	ListenerType              string `json:"ListenerType"`
+	NotificationListenerQueue string `json:"NotificationListenerQueue"`
+	LoadFlightChunkSizeInDays int    `json:"LoadFlightChunkSizeInDays"`
+	Flights                   map[string]Flight
+	CurrentLowerLimit         time.Time
+	CurrentUpperLimit         time.Time
+	CheckInAllocationMap      map[string]ResourceAllocationMap
+	StandAllocationMap        map[string]ResourceAllocationMap
+	GateAllocationMap         map[string]ResourceAllocationMap
+	CarouselAllocationMap     map[string]ResourceAllocationMap
+	ChuteAllocationMap        map[string]ResourceAllocationMap
 }
 
 type Repositories struct {

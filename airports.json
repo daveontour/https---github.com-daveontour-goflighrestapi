@@ -1,14 +1,14 @@
 {
-    "airports":[
+    "airports": [
         {
-            "Airport":"AUH",
-            "Token":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
-            "Url":"http://localhost/SITAAMSIntegrationService/v2/SITAAMSIntegrationService",
-            "RestUrl": "http://localhost/api/v1/",
-            "WindowMinimum": -3,
-            "WindowMaximum": 20,
-            "ListenerQueue": ".\\private$\\tow_tracker",
-            "ChunkSize":4
-        } 
+            "AMSAirport": "AUH",
+            "AMSToken": "0ab7d73d-e93a-480b-ba8c-a35943161cb0",
+            "AMSSOAPServiceURL": "http://localhost/SITAAMSIntegrationService/v2/SITAAMSIntegrationService",
+            "AMSRestServiceURL": "http://localhost/api/v1/",
+            "FlightSDOWindowMinimumInDaysFromNow": -3,
+            "FlightSDOWindowMaximumInDaysFromNow": 20,
+            "NotificationListenerQueue": ".\\private$\\tow_tracker",
+            "LoadFlightChunkSizeInDays": 4
+        }
     ]
 }

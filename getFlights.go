@@ -106,11 +106,11 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	}
 
 	//Check that the user is allowed to access the requested airline
-	if !contains(userProfile.AllowedAirlines, apt) &&
-		!contains(userProfile.AllowedAirlines, "*") {
+	if !contains(userProfile.AllowedAirports, apt) &&
+		!contains(userProfile.AllowedAirports, "*") {
 		return response, GetFlightsError{
 			StatusCode: http.StatusBadRequest,
-			Err:        errors.New("User is not allowed to access requested airline"),
+			Err:        errors.New("User is not allowed to access requested airport"),
 		}
 	}
 
@@ -314,11 +314,10 @@ NextFlight:
 		// function removed any message elements that the user is not allowed to see
 		returnFlights = append(returnFlights, f)
 	}
-
+	mapMutex.Unlock()
 	metricsLogger.Info(fmt.Sprintf("Filter Flights execution time: %s", time.Since(filterStart)))
 
 	returnFlights = prune(returnFlights, request)
-	mapMutex.Unlock()
 
 	response.NumberOfFlights = len(returnFlights)
 

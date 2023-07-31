@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -49,15 +50,19 @@ func startGinServer() {
 	router.GET("/admin/enableMetrics", func(c *gin.Context) {
 		if hasAdminToken(c) {
 			metricsLogger.SetLevel(logrus.InfoLevel)
+			metricsLogger.Info("Performance Metrics Reporting Enabled")
+			c.JSON(http.StatusOK, gin.H{"PerformanceMetricsReporting": fmt.Sprintf("Enabled")})
 		} else {
 			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
 		}
 	})
 	router.GET("/admin/disableMetrics", func(c *gin.Context) {
 		if hasAdminToken(c) {
+			metricsLogger.Info("Performance Metrics Reporting Disabled")
 			metricsLogger.SetLevel(logrus.ErrorLevel)
+			c.JSON(http.StatusOK, gin.H{"PerformanceMetricsReporting": fmt.Sprintf("Disabledd")})
 		} else {
-			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+			metricsLogger.Info("Performance Metrics Enabled")
 		}
 	})
 	router.GET("/help", func(c *gin.Context) {
@@ -225,6 +230,15 @@ func metricsReport(c *gin.Context) {
 		n = n + len(m.FlightAllocationsMap)
 	}
 	metrics.NumberOfChuteAllocations = n
+
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	metrics.MemAllocMB = int(m.Alloc / 1024 / 1024)
+	metrics.MemSysMB = int(m.Sys / 1024 / 1024)
+	metrics.MemTotaAllocMB = int(m.TotalAlloc / 1024 / 1024)
+	metrics.MemHeapAllocMB = int(m.HeapAlloc / 1024 / 1024)
+	metrics.MemNumGC = int(m.NumGC)
 
 	c.JSON(http.StatusOK, gin.H{"RepositoryMetrics": metrics})
 

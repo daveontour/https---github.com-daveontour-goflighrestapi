@@ -59,7 +59,7 @@ var schedulerMap = make(map[string]*gocron.Scheduler)
 var refreshSchedulerMap = make(map[string]*gocron.Scheduler)
 var userChangeSubscriptions []UserChangeSubscription
 
-var reservedParameters = []string{"airport", "airline", "al", "from", "to", "direction", "d", "route", "r"}
+var reservedParameters = []string{"airport", "airline", "al", "from", "to", "direction", "d", "route", "r", "sort"}
 
 func main() {
 

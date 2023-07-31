@@ -1,85 +1,118 @@
 {
-    "users":[
+    "users": [
         {
-            "UserName":"Default User",
-            "Key":"default",
-            "AllowedAirports":["AUH"],
-            "AllowedAirlines":["WY","QF","*"],
-            "AllowedCustomFields":["FlightUniqueID","Il--_DisembarkingFirstPad","Sh--_GroundHandler","Il--_TotalMalePax","S---_Terminal"],
-            "UserChangeSubscriptions":[
+            "UserName": "Default User",
+            "Key": "default",
+            "AllowedAirports": [
+                "AUH"
+            ],
+            "AllowedAirlines": [
+                "WY",
+                "QF",
+                "*"
+            ],
+            "AllowedCustomFields": [
+                "FlightUniqueID",
+                "Il--_DisembarkingFirstPad",
+                "Sh--_GroundHandler",
+                "Il--_TotalMalePax",
+                "S---_Terminal"
+            ],
+            "UserChangeSubscriptions": [
                 {
-                    "Enabled":true,
-                    "Airport":"AUH",
-                    "DestinationURL":"http://localhost:8081/test",
-                    "HeaderParameters":"",
-                    "CheckInChange":true,
-                    "GateChange":true,
-                    "StandChange":true,
-                    "CarouselChange":true,
-                    "ChuteChange":true,
-                    "AircraftTypeOrRegoChange":true,
-                    "EventChange":true,
-                    "CustomFieldChange":["Stand"],
+                    "Enabled": true,
+                    "Airport": "AUH",
+                    "DestinationURL": "http://localhost:8081/test",
+                    "HeaderParameters": [],
+                    "CheckInChange": true,
+                    "GateChange": true,
+                    "StandChange": true,
+                    "CarouselChange": true,
+                    "ChuteChange": true,
+                    "AircraftTypeOrRegoChange": true,
+                    "EventChange": true,
+                    "CustomFieldChange": [
+                        "Stand"
+                    ],
                     "CreateFlight": true,
-                    "DeleteFlight":true,
-                    "UpdateFlight":true
+                    "DeleteFlight": true,
+                    "UpdateFlight": true
                 }
             ],
             "UserPushSubscriptions": [
                 {
-                    "Enabled":false,
+                    "Enabled": true,
                     "PushOnStartUp": true,
-                    "Airport":"AUH",
-                    "DestinationURL":"http://localhost:8081/test",
-                    "HeaderParameters":"",
-                    "SubscriptionType":"Flight",
-                    "Time ":"14:00:00",
-                    "ReptitionHours ":1,
-                    "ReptitionMinutes":1,
-                    "Airline ":"",
-                    "From":0,
-                    "To":24,
-                    "QueryableCustomFields":[],
-                    "ResourceType":"",
-                    "ResourceID":"",
-                    "Route":"",
-                    "Direction":""
-                },                {
-                    "Enabled":false,
+                    "Airport": "AUH",
+                    "DestinationURL": "http://localhost:8081/test",
+                    "HeaderParameters": "",
+                    "SubscriptionType": "Flight",
+                    "Time": "14:00:00",
+                    "ReptitionHours": 1,
+                    "ReptitionMinutes": 1,
+                    "Airline": "",
+                    "From": 0,
+                    "To": 24,
+                    "QueryableCustomFields": [],
+                    "ResourceType": "",
+                    "ResourceID": "",
+                    "Route": "",
+                    "Direction": ""
+                },
+                {
+                    "Enabled": false,
                     "PushOnStartUp": true,
-                    "Airport":"AUH",
-                    "DestinationURL":"http://localhost:8081/test",
-                    "HeaderParameters":"",
-                    "SubscriptionType":"Resource",
-                    "Time ":"14:00:00",
-                    "ReptitionHours ":1,
-                    "ReptitionMinutes":1,
-                    "Airline ":"",
-                    "From":0,
-                    "To":24,
-                    "QueryableCustomFields":[],
-                    "ResourceType":"Stand",
-                    "ResourceID":"",
-                    "Route":"",
-                    "Direction":""
+                    "Airport": "AUH",
+                    "DestinationURL": "http://localhost:8081/test",
+                    "HeaderParameters": "",
+                    "SubscriptionType": "Resource",
+                    "Time": "14:00:00",
+                    "ReptitionHours": 1,
+                    "ReptitionMinutes": 1,
+                    "Airline": "",
+                    "From": 0,
+                    "To": 24,
+                    "QueryableCustomFields": [],
+                    "ResourceType": "Stand",
+                    "ResourceID": "",
+                    "Route": "",
+                    "Direction": ""
                 }
             ]
         },
         {
-            "UserName":"AUH",
-            "Key":"0ab7d73d-e93a-480b-ba8c-a35943161cb0",
-            "AllowedAirports":["AUH"],
-            "AllowedAirlines": ["*"],
-            "AllowedCustomFields": [],
-            "QueryableCustomFields": [],
+            "UserName": "AUH",
+            "Key": "0ab7d73d-e93a-480b-ba8c-a35943161cb0",
+            "AllowedAirports": [
+                "AUH"
+            ],
+            "AllowedAirlines": [
+                "*"
+            ],
+            "AllowedCustomFields": [
+                "*"
+            ]
+        },
+        {
+            "UserName": "Ground Handler1",
+            "Key": "12345678",
+            "AllowedAirports": [
+                "BAH"
+            ],
+            "AllowedAirlines": [
+                "QF",
+                "BA"
+            ],
+            "AllowedCustomFields": [
+                "FlightUniqueID",
+                "Sh--_GroundHandler"
+            ],
             "DefaultQueryableCustomFields": [
-                {"Parameter": "Il--_DisembarkingFirstPad","Value":"1"},
-                {"Parameter":"Sh--_GroundHandler","Value":"GroundHandler"}
-            ],
-            "overridequeryablecustomfields": [
-                {"Parameter": "Il--_DisembarkingFirstPad","Value":"1"}
-            ],
-            "DefaultAirline": "QF"                     
-        } 
+                {
+                    "Parameter": "Sh--_GroundHandler",
+                    "Value": "EAS"
+                }
+            ]
+        }
     ]
 }

@@ -44,7 +44,7 @@ const testNativeAPIMessage = `<soapenv:Envelope xmlns:soapenv="http://schemas.xm
 
 func GetRepo(airportCode string) *Repository {
 	for _, repo := range repoList {
-		if repo.Airport == airportCode {
+		if repo.AMSAirport == airportCode {
 			return &repo
 		}
 	}
@@ -67,7 +67,7 @@ func InitRepositories() {
 	}
 
 	for _, v := range repoList {
-		go initRepository(v.Airport)
+		go initRepository(v.AMSAirport)
 	}
 }
 
@@ -77,7 +77,7 @@ func reInitAirport(aptCode string) {
 	json.Unmarshal([]byte(readBytesFromFile("airports.json")), &repos)
 
 	for _, v := range repos.Repositories {
-		if v.Airport != aptCode {
+		if v.AMSAirport != aptCode {
 			continue
 		}
 		v.Flights = make(map[string]Flight)
@@ -110,7 +110,7 @@ func initRepository(airportCode string) {
 
 	// Purge the listening queue first before doing the Initializarion of the repository
 	opts := []msmq.QueueInfoOption{
-		msmq.WithPathName(GetRepo(airportCode).ListenerQueue),
+		msmq.WithPathName(GetRepo(airportCode).NotificationListenerQueue),
 	}
 	queueInfo, err := msmq.NewQueueInfo(opts...)
 	if err != nil {
@@ -193,7 +193,7 @@ func maintainRepository(airportCode string) {
 
 	//Listen to the notification queue
 	opts := []msmq.QueueInfoOption{
-		msmq.WithPathName(GetRepo(airportCode).ListenerQueue),
+		msmq.WithPathName(GetRepo(airportCode).NotificationListenerQueue),
 	}
 	queueInfo, err := msmq.NewQueueInfo(opts...)
 	if err != nil {
@@ -270,7 +270,7 @@ func updateRepository(airportCode string) {
 	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s. Updating Resource Map - Complete", airportCode))
 
 	repo := GetRepo(airportCode)
-	chunkSize := repo.ChunkSize
+	chunkSize := repo.LoadFlightChunkSizeInDays
 	if chunkSize < 1 {
 		chunkSize = 2
 	}
@@ -280,7 +280,7 @@ func updateRepository(airportCode string) {
 	repoMutex.Lock()
 	defer repoMutex.Unlock()
 
-	for min := GetRepo(airportCode).WindowMin; min <= GetRepo(airportCode).WindowMax; min += chunkSize {
+	for min := GetRepo(airportCode).WindowMinInDaysFromNow; min <= GetRepo(airportCode).WindowMaxInDaysFromNow; min += chunkSize {
 		var envel Envelope
 		xml.Unmarshal(getFlights(airportCode, min, min+chunkSize), &envel)
 
@@ -294,8 +294,8 @@ func updateRepository(airportCode string) {
 		flightsInitChannel <- len(envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight)
 	}
 
-	from := time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMin)
-	to := time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMax)
+	from := time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMinInDaysFromNow)
+	to := time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMaxInDaysFromNow)
 
 	GetRepo(airportCode).updateLowerLimit(time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location()))
 	GetRepo(airportCode).updateUpperLimit(time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, to.Location()))
@@ -338,11 +338,11 @@ func updateFlightEntry(message string) {
 
 	sdot := flight.GetSDO()
 
-	if sdot.Before(time.Now().AddDate(0, 0, repo.WindowMin-2)) {
+	if sdot.Before(time.Now().AddDate(0, 0, repo.WindowMinInDaysFromNow-2)) {
 		log.Println("Update for Flight Before Window")
 		return
 	}
-	if sdot.After(time.Now().AddDate(0, 0, repo.WindowMax+2)) {
+	if sdot.After(time.Now().AddDate(0, 0, repo.WindowMaxInDaysFromNow+2)) {
 		log.Println("Update for Flight After Window")
 		return
 	}
@@ -369,11 +369,11 @@ func createFlightEntry(message string) {
 	airportCode := flight.GetIATAAirport()
 	sdot := flight.GetSDO()
 
-	if sdot.Before(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMin-2)) {
+	if sdot.Before(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMinInDaysFromNow-2)) {
 		log.Println("Create for Flight Before Window")
 		return
 	}
-	if sdot.After(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMax+2)) {
+	if sdot.After(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMaxInDaysFromNow+2)) {
 		log.Println("Create for Flight After Window")
 		return
 	}
@@ -409,8 +409,8 @@ func deleteFlightEntry(message string) {
 func getFlights(airportCode string, values ...int) []byte {
 
 	repo := GetRepo(airportCode)
-	from := time.Now().AddDate(0, 0, repo.WindowMin).Format("2006-01-02")
-	to := time.Now().AddDate(0, 0, repo.WindowMax+1).Format("2006-01-02")
+	from := time.Now().AddDate(0, 0, repo.WindowMinInDaysFromNow).Format("2006-01-02")
+	to := time.Now().AddDate(0, 0, repo.WindowMaxInDaysFromNow+1).Format("2006-01-02")
 
 	// Change the window based on optional inout parameters
 	if len(values) >= 1 {
@@ -424,10 +424,10 @@ func getFlights(airportCode string, values ...int) []byte {
 
 	logger.Debug(fmt.Sprintf("Getting flight from %s to %s", from, to))
 
-	queryBody := fmt.Sprintf(xmlBody, repo.Token, from, to, repo.Airport)
+	queryBody := fmt.Sprintf(xmlBody, repo.AMSToken, from, to, repo.AMSAirport)
 	bodyReader := bytes.NewReader([]byte(queryBody))
 
-	req, err := http.NewRequest(http.MethodPost, repo.URL, bodyReader)
+	req, err := http.NewRequest(http.MethodPost, repo.AMSSOAPServiceURL, bodyReader)
 	if err != nil {
 		logger.Error(fmt.Sprintf("client: could not create request: %s\n", err))
 	}
@@ -582,7 +582,7 @@ func getResource(airportCode string, resourceType string) []byte {
 
 	repo := GetRepo(airportCode)
 
-	url := repo.RestURL + "/" + repo.Airport + "/" + resourceType
+	url := repo.AMSRestServiceURL + "/" + repo.AMSAirport + "/" + resourceType
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -590,7 +590,7 @@ func getResource(airportCode string, resourceType string) []byte {
 		return nil
 	}
 
-	req.Header.Set("Authorization", repo.Token)
+	req.Header.Set("Authorization", repo.AMSToken)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -611,10 +611,10 @@ func testNativeAPIConnectivity(airportCode string) bool {
 
 	repo := GetRepo(airportCode)
 
-	queryBody := fmt.Sprintf(testNativeAPIMessage, repo.Token)
+	queryBody := fmt.Sprintf(testNativeAPIMessage, repo.AMSToken)
 	bodyReader := bytes.NewReader([]byte(queryBody))
 
-	req, err := http.NewRequest(http.MethodPost, repo.URL, bodyReader)
+	req, err := http.NewRequest(http.MethodPost, repo.AMSSOAPServiceURL, bodyReader)
 	if err != nil {
 		logger.Error(fmt.Sprintf("Native API Test Client: could not create request: %s\n", err))
 		return false
@@ -635,7 +635,7 @@ func testNativeAPIConnectivity(airportCode string) bool {
 func testRestAPIConnectivity(airportCode string) bool {
 	repo := GetRepo(airportCode)
 
-	url := repo.RestURL + "/" + repo.Airport + "/Gates"
+	url := repo.AMSRestServiceURL + "/" + repo.AMSAirport + "/Gates"
 
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
@@ -643,7 +643,7 @@ func testRestAPIConnectivity(airportCode string) bool {
 		return false
 	}
 
-	req.Header.Set("Authorization", repo.Token)
+	req.Header.Set("Authorization", repo.AMSToken)
 
 	res, err := http.DefaultClient.Do(req)
 	if err != nil || res.StatusCode != 200 {
