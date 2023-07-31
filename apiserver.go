@@ -235,6 +235,7 @@ func metricsReport(c *gin.Context) {
 	runtime.ReadMemStats(&m)
 
 	metrics.MemAllocMB = int(m.Alloc / 1024 / 1024)
+
 	metrics.MemSysMB = int(m.Sys / 1024 / 1024)
 	metrics.MemTotaAllocMB = int(m.TotalAlloc / 1024 / 1024)
 	metrics.MemHeapAllocMB = int(m.HeapAlloc / 1024 / 1024)
