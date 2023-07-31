@@ -77,6 +77,21 @@ type ServiceConfig struct {
 	AdminToken                       string `json:"AdminToken"`
 }
 
+type MetricsReport struct {
+	Airport                     string
+	NumberOfFlights             int
+	NumberOfCheckins            int
+	NumberOfCheckinAllocations  int
+	NumberOfGates               int
+	NumberOfGateAllocations     int
+	NumberOfStands              int
+	NumberOfStandAllocations    int
+	NumberOfCarousels           int
+	NumberOfCarouselAllocations int
+	NumberOfChutes              int
+	NumberOfChuteAllocations    int
+}
+
 type UserProfile struct {
 	UserName                     string                   `json:"UserName"`
 	Key                          string                   `json:"Key"`

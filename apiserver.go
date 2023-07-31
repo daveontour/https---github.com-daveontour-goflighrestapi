@@ -45,7 +45,7 @@ func startGinServer() {
 	router.GET("/admin/stopJobs/:apt/:userToken", stopJobs)
 	router.GET("/admin/stopAllAptJobs/:apt", stopAllAptJobs)
 	router.GET("/admin/rescheduleAllAptJobs/:apt", rescheduleAllAptJobs)
-
+	router.GET("/admin/repoMetricsReport/:apt", metricsReport)
 	router.GET("/admin/enableMetrics", func(c *gin.Context) {
 		if hasAdminToken(c) {
 			metricsLogger.SetLevel(logrus.InfoLevel)
@@ -147,7 +147,10 @@ func startGinServer() {
 }
 
 func hasAdminToken(c *gin.Context) bool {
-	keys := c.Request.Header["token"]
+	keys := c.Request.Header["Token"]
+	if keys == nil {
+		return false
+	}
 	if keys[0] == serviceConfig.AdminToken {
 		return true
 	} else {
@@ -166,6 +169,65 @@ func reinit(c *gin.Context) {
 
 	apt := c.Param("apt")
 	reInitAirport(apt)
+}
+
+func metricsReport(c *gin.Context) {
+	// Get the profile of the user making the request
+
+	if !hasAdminToken(c) {
+		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		return
+	} else {
+		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+	}
+
+	apt := c.Param("apt")
+
+	metrics := MetricsReport{}
+	metrics.Airport = apt
+
+	repo := GetRepo(apt)
+
+	metrics.NumberOfFlights = len(repo.Flights)
+	metrics.NumberOfCheckins = len(repo.CheckInAllocationMap)
+
+	metrics.NumberOfGates = len(repo.GateAllocationMap)
+	metrics.NumberOfStands = len(repo.StandAllocationMap)
+	metrics.NumberOfCarousels = len(repo.CarouselAllocationMap)
+	metrics.NumberOfChutes = len(repo.ChuteAllocationMap)
+
+	n := 0
+	for _, m := range repo.CheckInAllocationMap {
+		n = n + len(m.FlightAllocationsMap)
+	}
+	metrics.NumberOfCheckinAllocations = n
+
+	n = 0
+	for _, m := range repo.GateAllocationMap {
+		n = n + len(m.FlightAllocationsMap)
+	}
+	metrics.NumberOfGateAllocations = n
+
+	n = 0
+	for _, m := range repo.StandAllocationMap {
+		n = n + len(m.FlightAllocationsMap)
+	}
+	metrics.NumberOfStandAllocations = n
+
+	n = 0
+	for _, m := range repo.CarouselAllocationMap {
+		n = n + len(m.FlightAllocationsMap)
+	}
+	metrics.NumberOfCarouselAllocations = n
+
+	n = 0
+	for _, m := range repo.ChuteAllocationMap {
+		n = n + len(m.FlightAllocationsMap)
+	}
+	metrics.NumberOfChuteAllocations = n
+
+	c.JSON(http.StatusOK, gin.H{"RepositoryMetrics": metrics})
+
 }
 
 func stopJobs(c *gin.Context) {
@@ -244,7 +306,7 @@ func getUserProfile(c *gin.Context, userToken string) UserProfile {
 	key := userToken
 
 	if c != nil {
-		keys := c.Request.Header["token"]
+		keys := c.Request.Header["Token"]
 		key = "default"
 
 		if keys != nil {
