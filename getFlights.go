@@ -18,6 +18,11 @@ func getRequestedFlightsAPI(c *gin.Context) {
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
 
+	if !userProfile.Enabled {
+		c.JSON(http.StatusUnauthorized, gin.H{"Error": fmt.Sprintf("%s", "User Access Has Been Disabled")})
+		return
+	}
+
 	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
@@ -45,6 +50,7 @@ func getRequestedFlightsAPI(c *gin.Context) {
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", error.Err.Error())})
 	}
+
 }
 
 func getRequestedFlightsSub(sub UserPushSubscription, userToken string) (Response, GetFlightsError) {
@@ -136,7 +142,10 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	var err error
 
 	// Get the filtered and pruned flights for the request
-	response, err = filterFlights(request, response, GetRepo(apt).Flights, c)
+	mapMutex.Lock()
+	flights := GetRepo(apt).Flights
+	response, err = filterFlights(request, response, flights, c)
+	mapMutex.Unlock()
 
 	if err == nil {
 		return response, GetFlightsError{
@@ -249,8 +258,6 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 		}
 	}
 
-	mapMutex.Lock()
-
 	filterStart := time.Now()
 NextFlight:
 	for _, f := range flights {
@@ -312,9 +319,10 @@ NextFlight:
 
 		// Made it here without being filtered out, so add it to the flights to be returned. The "prune"
 		// function removed any message elements that the user is not allowed to see
+		f.Action = StatusAction
 		returnFlights = append(returnFlights, f)
 	}
-	mapMutex.Unlock()
+
 	metricsLogger.Info(fmt.Sprintf("Filter Flights execution time: %s", time.Since(filterStart)))
 
 	returnFlights = prune(returnFlights, request)
@@ -327,7 +335,6 @@ NextFlight:
 	})
 
 	response.Flights = returnFlights
-
 	response.CustomFieldQuery = request.PresentQueryableParameters
 
 	return response, nil
@@ -339,8 +346,6 @@ func prune(flights []Flight, request Request) (flDups []Flight) {
 	defer exeTime(fmt.Sprintf("Pruning %v Filtered Flights", len(flights)))()
 
 	for _, flight := range flights {
-
-		//	flDup := flight.DuplicateFlight()
 
 		//Go creates a copy with the below assignment
 		flDup := flight
@@ -383,43 +388,3 @@ func prune(flights []Flight, request Request) (flDups []Flight) {
 
 	return
 }
-
-// // Creates a copy of the flight record with the custom fields that the user is allowed to see
-// func prune(flight Flight, request Request) (flDup Flight) {
-
-// 	defer exeTime("PruningFilterdFlight")()
-// 	flDup = flight.DuplicateFlight()
-// 	flDup.FlightState.Value = []Value{}
-
-// 	// If Allowed CustomFields is not nil, then filter the custome fields
-// 	// if "*" in list then it is all custom fields
-// 	// Extra safety, if the parameter is not defined, then no results returned
-
-// 	if request.UserProfile.AllowedCustomFields != nil {
-// 		if contains(request.UserProfile.AllowedCustomFields, "*") {
-// 			flDup.FlightState.Value = flight.FlightState.Value
-// 		} else {
-// 			for _, property := range request.UserProfile.AllowedCustomFields {
-// 				data := flight.GetProperty(property)
-
-// 				if data != "" {
-// 					flDup.FlightState.Value = append(flDup.FlightState.Value, Value{property, data})
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	changes := []Change{}
-
-// 	for ii := 0; ii < len(flDup.FlightChanges.Changes); ii++ {
-// 		ok := contains(request.UserProfile.AllowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
-// 		ok = ok || request.UserProfile.AllowedCustomFields == nil
-// 		if ok {
-// 			changes = append(changes, flDup.FlightChanges.Changes[ii])
-// 		}
-// 	}
-
-// 	flDup.FlightChanges.Changes = changes
-
-// 	return
-// }

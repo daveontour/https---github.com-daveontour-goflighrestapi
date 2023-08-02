@@ -98,6 +98,7 @@ type MetricsReport struct {
 }
 
 type UserProfile struct {
+	Enabled                      bool                     `json:"Enabled"`
 	UserName                     string                   `json:"UserName"`
 	Key                          string                   `json:"Key"`
 	AllowedAirports              []string                 `json:"AllowedAirports"`

@@ -32,6 +32,12 @@ func getResourceAPI(c *gin.Context) {
 	defer exeTime(fmt.Sprintf("Get Resources Request for %s", c.Request.URL))()
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
+
+	if !userProfile.Enabled {
+		c.JSON(http.StatusUnauthorized, gin.H{"Error": fmt.Sprintf("%s", "User Access Has Been Disabled")})
+		return
+	}
+
 	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
@@ -171,6 +177,9 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 
 	var alloc = []AllocationResponseItem{}
 
+	mapMutex.Lock()
+	defer mapMutex.Unlock()
+
 	allocMaps := []map[string]ResourceAllocationMap{
 		GetRepo(apt).CheckInAllocationMap,
 		GetRepo(apt).GateAllocationMap,
@@ -208,7 +217,7 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 			}
 
 			mapp := allocMap[r.Resource.Name]
-			for _, v := range allocMap[r.Resource.Name].FlightAllocationsMap {
+			for _, v := range mapp.FlightAllocationsMap {
 
 				test := false
 
@@ -297,8 +306,13 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 
 func getConfiguredResources(c *gin.Context) {
 
+	defer exeTime(fmt.Sprintf("Get Configured Resources Request for %s", c.Request.URL))()
 	// Get the profile of the user making the request
 	userProfile := getUserProfile(c, "")
+	if !userProfile.Enabled {
+		c.JSON(http.StatusUnauthorized, gin.H{"Error": fmt.Sprintf("%s", "User Access Has Been Disabled")})
+		return
+	}
 	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")

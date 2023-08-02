@@ -140,28 +140,29 @@ func initRepository(airportCode string) {
 
 func populateResourceMaps(airportCode string) {
 
+	repo := GetRepo(airportCode)
 	logger.Info(fmt.Sprintf("Populating Resource Maps for %s", airportCode))
 	// Retrieve the available resources
 
 	var checkIns FixedResources
 	xml.Unmarshal(getResource(airportCode, "CheckIns"), &checkIns)
-	addResourcesToMap(checkIns.Values, GetRepo(airportCode).CheckInAllocationMap)
+	addResourcesToMap(checkIns.Values, repo.CheckInAllocationMap)
 
 	var stands FixedResources
 	xml.Unmarshal(getResource(airportCode, "Stands"), &stands)
-	addResourcesToMap(stands.Values, GetRepo(airportCode).StandAllocationMap)
+	addResourcesToMap(stands.Values, repo.StandAllocationMap)
 
 	var gates FixedResources
 	xml.Unmarshal(getResource(airportCode, "Gates"), &gates)
-	addResourcesToMap(gates.Values, GetRepo(airportCode).GateAllocationMap)
+	addResourcesToMap(gates.Values, repo.GateAllocationMap)
 
 	var carousels FixedResources
 	xml.Unmarshal(getResource(airportCode, "Carousels"), &carousels)
-	addResourcesToMap(carousels.Values, GetRepo(airportCode).CarouselAllocationMap)
+	addResourcesToMap(carousels.Values, repo.CarouselAllocationMap)
 
 	var chutes FixedResources
 	xml.Unmarshal(getResource(airportCode, "Chutes"), &chutes)
-	addResourcesToMap(chutes.Values, GetRepo(airportCode).ChuteAllocationMap)
+	addResourcesToMap(chutes.Values, repo.ChuteAllocationMap)
 
 	logger.Info(fmt.Sprintf("Completed Populating Resource Maps for %s", airportCode))
 }
@@ -214,7 +215,7 @@ func maintainRepository(airportCode string) {
 			continue
 		}
 
-		message, err := msg.Body()
+		message, _ := msg.Body()
 
 		if strings.Contains(message, "FlightUpdatedNotification") {
 			updateFlightEntry(message)
@@ -277,9 +278,6 @@ func updateRepository(airportCode string) {
 
 	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s. Getting flights. Chunk Size: %v days", airportCode, chunkSize))
 
-	repoMutex.Lock()
-	defer repoMutex.Unlock()
-
 	for min := GetRepo(airportCode).WindowMinInDaysFromNow; min <= GetRepo(airportCode).WindowMaxInDaysFromNow; min += chunkSize {
 		var envel Envelope
 		xml.Unmarshal(getFlights(airportCode, min, min+chunkSize), &envel)
@@ -287,18 +285,20 @@ func updateRepository(airportCode string) {
 		for _, flight := range envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight {
 			flight.LastUpdate = time.Now()
 			flight.Action = StatusAction
-			GetRepo(airportCode).Flights[flight.GetFlightID()] = flight
+			mapMutex.Lock()
+			repo.Flights[flight.GetFlightID()] = flight
 			upadateAllocation(flight, airportCode)
+			mapMutex.Unlock()
 		}
 
 		flightsInitChannel <- len(envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight)
 	}
 
-	from := time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMinInDaysFromNow)
-	to := time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMaxInDaysFromNow)
+	from := time.Now().AddDate(0, 0, repo.WindowMinInDaysFromNow)
+	to := time.Now().AddDate(0, 0, repo.WindowMaxInDaysFromNow)
 
-	GetRepo(airportCode).updateLowerLimit(time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location()))
-	GetRepo(airportCode).updateUpperLimit(time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, to.Location()))
+	repo.updateLowerLimit(time.Date(from.Year(), from.Month(), from.Day(), 0, 0, 0, 0, from.Location()))
+	repo.updateUpperLimit(time.Date(to.Year(), to.Month(), to.Day(), 0, 0, 0, 0, to.Location()))
 
 	logger.Info(fmt.Sprintf("Repository updated for %s  Number of flights = %v", airportCode, len(GetRepo(airportCode).Flights)))
 
@@ -307,6 +307,9 @@ func updateRepository(airportCode string) {
 func cleanRepository(from time.Time, airportCode string) {
 
 	// Cleans the repository of old entries
+
+	mapMutex.Lock()
+	defer mapMutex.Unlock()
 
 	logger.Info(fmt.Sprintf("Cleaning repository from: %s", from))
 	flights := GetRepo(airportCode).Flights
@@ -330,8 +333,6 @@ func updateFlightEntry(message string) {
 	xml.Unmarshal([]byte(message), &envel)
 
 	flight := envel.Content.FlightUpdatedNotification.Flight
-	flight.LastUpdate = time.Now()
-	flight.Action = UpdateAction
 
 	airportCode := flight.GetIATAAirport()
 	repo := GetRepo(airportCode)
@@ -339,21 +340,23 @@ func updateFlightEntry(message string) {
 	sdot := flight.GetSDO()
 
 	if sdot.Before(time.Now().AddDate(0, 0, repo.WindowMinInDaysFromNow-2)) {
-		log.Println("Update for Flight Before Window")
+		logger.Debugf("Update for Flight Before Window. Flight ID: %s", flight.GetFlightID())
 		return
 	}
 	if sdot.After(time.Now().AddDate(0, 0, repo.WindowMaxInDaysFromNow+2)) {
-		log.Println("Update for Flight After Window")
+		logger.Debugf("Update for Flight After Window. Flight ID: %s", flight.GetFlightID())
 		return
 	}
 
+	flight.LastUpdate = time.Now()
+	flight.Action = UpdateAction
+
 	flightID := flight.GetFlightID()
 
-	repoMutex.Lock()
-	GetRepo(airportCode).Flights[flightID] = flight
-	repoMutex.Unlock()
-
+	mapMutex.Lock()
+	repo.Flights[flightID] = flight
 	upadateAllocation(flight, airportCode)
+	mapMutex.Unlock()
 
 	flightUpdatedChannel <- flight
 }
@@ -377,11 +380,11 @@ func createFlightEntry(message string) {
 		log.Println("Create for Flight After Window")
 		return
 	}
-	repoMutex.Lock()
+	mapMutex.Lock()
 	GetRepo(airportCode).Flights[flight.GetFlightID()] = flight
-	repoMutex.Unlock()
-
 	upadateAllocation(flight, airportCode)
+	mapMutex.Unlock()
+
 	flightCreatedChannel <- flight
 }
 func deleteFlightEntry(message string) {
@@ -397,13 +400,11 @@ func deleteFlightEntry(message string) {
 
 	airportCode := flight.GetIATAAirport()
 
-	repoMutex.Lock()
-	//if airportentry, ok := repoMap[repo.Airport]; ok {
+	mapMutex.Lock()
 	delete(GetRepo(airportCode).Flights, flightID)
-	//}
-	repoMutex.Unlock()
-
 	deleteAllocation(flight, airportCode)
+	mapMutex.Unlock()
+
 	flightDeletedChannel <- flight
 }
 func getFlights(airportCode string, values ...int) []byte {
@@ -556,8 +557,6 @@ func deleteAllocation(flight Flight, airportCode string) {
 	repo := GetRepo(airportCode)
 	flightId := flight.GetFlightID()
 
-	mapMutex.Lock()
-
 	for _, v := range repo.CheckInAllocationMap {
 		delete(v.FlightAllocationsMap, flightId)
 	}
@@ -574,7 +573,6 @@ func deleteAllocation(flight Flight, airportCode string) {
 		delete(v.FlightAllocationsMap, flightId)
 	}
 
-	mapMutex.Unlock()
 }
 
 // Retrieve resources from AMS

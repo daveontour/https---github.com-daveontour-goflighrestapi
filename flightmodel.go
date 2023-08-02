@@ -484,7 +484,7 @@ type GateSlotsChange struct {
 }
 type StandSlotChange struct {
 	OldValue struct {
-		SdandSlot struct {
+		StandSlot struct {
 			Value []PropertyValuePair `xml:"Value"`
 		} `xml:"StandSlot"`
 	} `xml:"OldValue"`

@@ -13,7 +13,6 @@ import (
 	"math/big"
 	"net/http"
 	"os"
-	"path/filepath"
 	"runtime"
 	"time"
 
@@ -80,6 +79,16 @@ func startGinServer() {
 		}
 		c.Header("Content-Type", "text/html")
 		_, _ = c.Writer.Write(data)
+	})
+
+	router.GET("/memTest", func(c *gin.Context) {
+		i := 0
+		for {
+			response, _ := getRequestedFlightsCommon("AUH", "", "", "", "", "", "", "default", nil, []ParameterValuePair{})
+			j, _ := json.Marshal(response)
+			fmt.Printf("Iteration %v, Length %v\n", i, len(j))
+			i++
+		}
 	})
 
 	// Start it up with the configured security mode
@@ -294,25 +303,28 @@ func rescheduleAllAptJobs(c *gin.Context) {
 
 func getUserProfile(c *gin.Context, userToken string) UserProfile {
 
+	defer exeTime("Getting User Profile")()
+
 	//Read read the file for each request so changes can be made without the need to restart the server
 
-	ex, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	exPath := filepath.Dir(ex)
+	// ex, err := os.Executable()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// exPath := filepath.Dir(ex)
 
-	fileContent, err := os.Open(filepath.Join(exPath, "users.json"))
+	//fileContent, err := os.Open(filepath.Join(exPath, "users.json"))
+	// fileContent, err := os.Open("users.json")
 
-	if err != nil {
-		logger.Error("Error Reading " + filepath.Join(exPath, "users.json"))
-		logger.Error(err.Error())
-		return UserProfile{}
-	}
+	// if err != nil {
+	// 	logger.Error("Error Reading " + filepath.Join(exPath, "users.json"))
+	// 	logger.Error(err.Error())
+	// 	return UserProfile{}
+	// }
 
-	defer fileContent.Close()
+	// defer fileContent.Close()
 
-	byteResult, _ := ioutil.ReadAll(fileContent)
+	byteResult := readBytesFromFile("users.json")
 
 	var users Users
 
@@ -339,6 +351,7 @@ func getUserProfile(c *gin.Context, userToken string) UserProfile {
 	}
 
 	return userProfile
+
 }
 
 // Function to just write what was recieved by the server

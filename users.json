@@ -1,6 +1,7 @@
 {
     "users": [
         {
+            "Enabled": true,
             "UserName": "Default User",
             "Key": "default",
             "AllowedAirports": [
@@ -49,7 +50,7 @@
                     "SubscriptionType": "Flight",
                     "Time": "14:00:00",
                     "ReptitionHours": 1,
-                    "ReptitionMinutes": 1,
+                    "ReptitionMinutes": 2,
                     "Airline": "",
                     "From": 0,
                     "To": 24,
@@ -68,7 +69,7 @@
                     "SubscriptionType": "Resource",
                     "Time": "14:00:00",
                     "ReptitionHours": 1,
-                    "ReptitionMinutes": 1,
+                    "ReptitionMinutes": 0,
                     "Airline": "",
                     "From": 0,
                     "To": 24,
@@ -81,6 +82,7 @@
             ]
         },
         {
+            "Enabled":true,
             "UserName": "AUH",
             "Key": "0ab7d73d-e93a-480b-ba8c-a35943161cb0",
             "AllowedAirports": [

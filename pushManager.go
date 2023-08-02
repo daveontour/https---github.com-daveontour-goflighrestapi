@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -19,6 +20,8 @@ func reloadschedulePushes(airportCode string) {
 	go schedulePushes(airportCode)
 }
 
+var schedPushLock sync.Mutex
+
 func schedulePushes(airportCode string) {
 
 	today := time.Now().Format("2006-01-02")
@@ -27,6 +30,7 @@ func schedulePushes(airportCode string) {
 	schedulerMap[airportCode] = s
 
 	for _, u := range getUserProfiles() {
+
 		for _, sub := range u.UserPushSubscriptions {
 			if sub.Airport != airportCode || !sub.Enabled {
 				continue
@@ -62,14 +66,17 @@ func schedulePushes(airportCode string) {
 
 func handleFlightUpdate(flt Flight) {
 	checkForImpactedSubscription(flt)
+	return
 }
 
 func handleFlightCreate(flt Flight) {
 	checkForImpactedSubscription(flt)
+	return
 }
 
 func handleFlightDelete(flt Flight) {
 	checkForImpactedSubscription(flt)
+	return
 }
 
 // Check if any of the registered change subscriptions are interested in this change
@@ -81,8 +88,8 @@ func checkForImpactedSubscription(flt Flight) {
 		return
 	}
 
-	changeSubscriptionMutex.Lock()
-	defer changeSubscriptionMutex.Unlock()
+	userChangeSubscriptionsMutex.Lock()
+	defer userChangeSubscriptionsMutex.Unlock()
 
 NextSub:
 	for _, sub := range userChangeSubscriptions {
@@ -141,7 +148,7 @@ NextSub:
 			continue
 		}
 		if sub.GateChange && flt.FlightChanges.GateSlotsChange != nil {
-			executeChangePush(sub, flt)
+			go executeChangePush(sub, flt)
 			continue
 		}
 		if sub.StandChange && flt.FlightChanges.StandSlotsChange != nil {
@@ -153,7 +160,7 @@ NextSub:
 			continue
 		}
 		if sub.CarouselChange && flt.FlightChanges.CarouselSlotsChange != nil {
-			executeChangePush(sub, flt)
+			go executeChangePush(sub, flt)
 			continue
 		}
 
@@ -166,6 +173,8 @@ NextSub:
 			continue
 		}
 	}
+
+	return
 }
 
 // Function that sends the flight to the defined endpoint
@@ -186,7 +195,10 @@ func executeChangePush(sub UserChangeSubscription, flight Flight) {
 		req.Header.Add(pair.Parameter, pair.Value)
 	}
 
-	r, sendErr := http.DefaultClient.Do(req)
+	client := http.Client{
+		Timeout: 20 * time.Second,
+	}
+	r, sendErr := client.Do(req)
 	if sendErr != nil {
 		logger.Error(fmt.Sprintf("Change Push Client. Error making http request: %s", sendErr))
 	}
@@ -197,11 +209,16 @@ func executeChangePush(sub UserChangeSubscription, flight Flight) {
 
 func executeScheduledPush(sub UserPushSubscription, userToken, userName string) {
 
+	// schedPushLock.Lock()
+	// defer schedPushLock.Unlock()
+
 	logger.Info(fmt.Sprintf("Executing Scheduled Push for User %s", userName))
 
 	var response interface{}
 	var error GetFlightsError
 
+	// filterMutex.Lock()
+	// defer filterMutex.Unlock()
 	if strings.ToLower(sub.SubscriptionType) == "flight" {
 		response, error = getRequestedFlightsSub(sub, userToken)
 	} else if strings.ToLower(sub.SubscriptionType) == "resource" {
@@ -233,4 +250,6 @@ func executeScheduledPush(sub UserPushSubscription, userToken, userName string) 
 	if r.StatusCode != 200 {
 		logger.Error(fmt.Sprintf("Scheduled Push Client. Error making HTTP request: Returned status code = %v. URL = %s", r.StatusCode, sub.DestinationURL))
 	}
+
+	return
 }

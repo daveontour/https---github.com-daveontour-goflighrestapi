@@ -3,9 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -30,9 +28,7 @@ import (
 var repoList []Repository
 var wg sync.WaitGroup
 
-var repoMutex sync.Mutex
-var mapMutex sync.Mutex
-var changeSubscriptionMutex sync.Mutex
+var mapMutex = &sync.RWMutex{}
 var serviceConfig ServiceConfig
 var isDebug bool = false
 
@@ -57,7 +53,9 @@ var flightsInitChannel = make(chan int)
 
 var schedulerMap = make(map[string]*gocron.Scheduler)
 var refreshSchedulerMap = make(map[string]*gocron.Scheduler)
+
 var userChangeSubscriptions []UserChangeSubscription
+var userChangeSubscriptionsMutex = &sync.RWMutex{}
 
 var reservedParameters = []string{"airport", "airline", "al", "from", "to", "direction", "d", "route", "r", "sort"}
 
@@ -158,8 +156,10 @@ func main() {
 		err = controlService(svcName, svc.Continue, svc.Running)
 	default:
 		splash()
-		usage(fmt.Sprintf("invalid command %s", cmd))
-		os.Exit(2)
+		runService(svcName, true)
+		//splash()
+		//usage(fmt.Sprintf("invalid command %s", cmd))
+		//os.Exit(2)
 	}
 	if err != nil {
 		log.Fatalf("failed to %s %s: %v", cmd, svcName, err)
@@ -197,14 +197,14 @@ func splash() {
 	fmt.Println()
 }
 func getServiceConfig() ServiceConfig {
-	ex, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	exPath := filepath.Dir(ex)
+	// ex, err := os.Executable()
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// exPath := filepath.Dir(ex)
 
-	fileContent, err := os.Open(filepath.Join(exPath, "service.json"))
-	byteResult, _ := ioutil.ReadAll(fileContent)
+	//fileContent, err := os.Open(filepath.Join(exPath, "service.json"))
+	byteResult := readBytesFromFile("service.json")
 
 	var serviceConfig ServiceConfig
 	json.Unmarshal([]byte(byteResult), &serviceConfig)
@@ -393,9 +393,11 @@ func runProgram() {
 	go InitRepositories()
 
 	// Initiate the User Change Subscriptions
+	userChangeSubscriptionsMutex.Lock()
 	for _, up := range getUserProfiles() {
 		userChangeSubscriptions = append(userChangeSubscriptions, up.UserChangeSubscriptions...)
 	}
+	userChangeSubscriptionsMutex.Unlock()
 	wg.Wait()
 }
 
