@@ -613,6 +613,8 @@ type FlightChanges struct {
 	Changes             []Change             `xml:"PropertyChanges"`
 }
 type Flight struct {
+	PrevNode      *Flight       `xml:"-" json:"-"`
+	NextNode      *Flight       `xml:"-" json:"-"`
 	Action        string        `xml:"Action" json:"Action"`
 	FlightId      FlightId      `xml:"FlightId" json:"FlightId"`
 	FlightState   FlightState   `xml:"FlightState" json:"FlightState"`
@@ -720,8 +722,7 @@ func (fs Flight) DuplicateFlight() Flight {
 }
 
 type Envelope struct {
-	XMLName xml.Name `xml:"Envelope"`
-	Body    struct {
+	Body struct {
 		GetFlightsResponse struct {
 			GetFlightsResult struct {
 				WebServiceResult struct {
@@ -737,7 +738,6 @@ type Envelope struct {
 }
 
 type FlightCreatedNotificatioEnvelope struct {
-	XMLName xml.Name `xml:"Envelope"`
 	Content struct {
 		FlightCreatedNotification struct {
 			Flight Flight `xml:"Flight"`
@@ -745,7 +745,6 @@ type FlightCreatedNotificatioEnvelope struct {
 	} `xml:"Content"`
 }
 type FlightUpdatedNotificatioEnvelope struct {
-	XMLName xml.Name `xml:"Envelope"`
 	Content struct {
 		FlightUpdatedNotification struct {
 			Flight Flight `xml:"Flight"`
@@ -753,7 +752,6 @@ type FlightUpdatedNotificatioEnvelope struct {
 	} `xml:"Content"`
 }
 type FlightDeletedNotificatioEnvelope struct {
-	XMLName xml.Name `xml:"Envelope"`
 	Content struct {
 		FlightDeletedNotification struct {
 			Flight Flight `xml:"Flight"`

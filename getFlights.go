@@ -143,7 +143,7 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 
 	// Get the filtered and pruned flights for the request
 	mapMutex.Lock()
-	flights := GetRepo(apt).Flights
+	flights := GetRepo(apt).FlightLinkedList
 	response, err = filterFlights(request, response, flights, c)
 	mapMutex.Unlock()
 
@@ -216,7 +216,7 @@ func processCustomFieldQueries(request Request, response Response, c *gin.Contex
 
 	return request, response
 }
-func filterFlights(request Request, response Response, flights map[string]Flight, c *gin.Context) (Response, error) {
+func filterFlights(request Request, response Response, flightsLinkedList FlightLinkedList, c *gin.Context) (Response, error) {
 
 	//defer exeTime("Filter, Prune and Sort Flights")()
 	returnFlights := []Flight{}
@@ -259,50 +259,62 @@ func filterFlights(request Request, response Response, flights map[string]Flight
 	}
 
 	filterStart := time.Now()
-NextFlight:
-	for _, f := range flights {
 
-		if f.GetSTO().Before(from) {
+	currentFlight := flightsLinkedList.Head
+
+NextFlight:
+	for currentFlight != nil {
+
+		if currentFlight.GetSTO().Before(from) {
+			currentFlight = currentFlight.NextNode
 			continue
 		}
 
-		if f.GetSTO().After(to) {
+		if currentFlight.GetSTO().After(to) {
+			currentFlight = currentFlight.NextNode
 			continue
 		}
 
 		for _, queryableParameter := range request.PresentQueryableParameters {
 			queryValue := queryableParameter.Value
-			flightValue := f.GetProperty(queryableParameter.Parameter)
+			flightValue := currentFlight.GetProperty(queryableParameter.Parameter)
 
 			if flightValue == "" || queryValue != flightValue {
+				currentFlight = currentFlight.NextNode
 				continue NextFlight
 			}
 		}
 
 		// Flight direction filter
-		if strings.HasPrefix(request.Direction, "D") && f.IsArrival() {
+		if strings.HasPrefix(request.Direction, "D") && currentFlight.IsArrival() {
+			currentFlight = currentFlight.NextNode
 			continue
 		}
-		if strings.HasPrefix(request.Direction, "A") && !f.IsArrival() {
+		if strings.HasPrefix(request.Direction, "A") && !currentFlight.IsArrival() {
+			currentFlight = currentFlight.NextNode
 			continue
 		}
 
 		// Requested Airline Code filter
-		if request.Airline != "" && f.GetIATAAirline() != request.Airline {
+		if request.Airline != "" && currentFlight.GetIATAAirline() != request.Airline {
+			currentFlight = currentFlight.NextNode
 			continue
 		}
 
 		// RequestedRoute filter
-		if request.Route != "" && !strings.Contains(f.GetFlightRoute(), request.Route) {
+		if request.Route != "" && !strings.Contains(currentFlight.GetFlightRoute(), request.Route) {
+			currentFlight = currentFlight.NextNode
 			continue
 		}
 
-		if request.FltNum != "" && !strings.Contains(f.GetFlightID(), request.FltNum) {
+		if request.FltNum != "" && !strings.Contains(currentFlight.GetFlightID(), request.FltNum) {
+			currentFlight = currentFlight.NextNode
 			continue
 		}
 
 		if request.UpdatedSince != "" {
-			if f.LastUpdate.Before(updatedSinceTime) {
+			if currentFlight.LastUpdate.Before(updatedSinceTime) {
+				currentFlight = currentFlight.NextNode
 				continue
 			}
 		}
@@ -311,7 +323,8 @@ NextFlight:
 		// "*" entry in AllowedAirlines allows all.
 		if !allowedAllAirline {
 			if request.UserProfile.AllowedAirlines != nil {
-				if !contains(request.UserProfile.AllowedAirlines, f.GetIATAAirline()) {
+				if !contains(request.UserProfile.AllowedAirlines, currentFlight.GetIATAAirline()) {
+					currentFlight = currentFlight.NextNode
 					continue
 				}
 			}
@@ -319,8 +332,9 @@ NextFlight:
 
 		// Made it here without being filtered out, so add it to the flights to be returned. The "prune"
 		// function removed any message elements that the user is not allowed to see
-		f.Action = StatusAction
-		returnFlights = append(returnFlights, f)
+		currentFlight.Action = StatusAction
+		returnFlights = append(returnFlights, *currentFlight)
+		currentFlight = currentFlight.NextNode
 	}
 
 	metricsLogger.Info(fmt.Sprintf("Filter Flights execution time: %s", time.Since(filterStart)))

@@ -111,7 +111,7 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 		response.Airline = "All Airlines"
 	}
 
-	if resourceType != "" && !strings.Contains(strings.ToLower("Checkin Gate Stand Carousel Chute"), strings.ToLower(resourceType)) {
+	if resourceType != "" && !strings.Contains(strings.ToLower("Checkin Gate Stand Carousel Chute Checkins Gates Stands Carousels Chutes"), strings.ToLower(resourceType)) {
 		return response, GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("Invalid resouce type specified."),
@@ -180,44 +180,50 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 	mapMutex.Lock()
 	defer mapMutex.Unlock()
 
-	allocMaps := []map[string]ResourceAllocationMap{
-		GetRepo(apt).CheckInAllocationMap,
-		GetRepo(apt).GateAllocationMap,
-		GetRepo(apt).StandAllocationMap,
-		GetRepo(apt).ChuteAllocationMap,
-		GetRepo(apt).CarouselAllocationMap}
+	repo := GetRepo(apt)
+	allocMaps := []ResourceLinkedList{
+		repo.CheckInList,
+		repo.GateList,
+		repo.StandList,
+		repo.ChuteList,
+		repo.CarouselList}
 
 	filterStart := time.Now()
 	for idx, allocMap := range allocMaps {
 
 		//If a resource type has been specified, ignore the rest
 		if resourceType != "" {
-			if strings.ToLower(resourceType) == "checkin" && idx != 0 {
+			if (strings.ToLower(resourceType) == "checkin" || strings.ToLower(resourceType) == "checkins") && idx != 0 {
 				continue
 			}
-			if strings.ToLower(resourceType) == "gate" && idx != 1 {
+			if (strings.ToLower(resourceType) == "gate" || strings.ToLower(resourceType) == "gates") && idx != 1 {
 				continue
 			}
-			if strings.ToLower(resourceType) == "stand" && idx != 2 {
+			if (strings.ToLower(resourceType) == "stand" || strings.ToLower(resourceType) == "stands") && idx != 2 {
 				continue
 			}
-			if strings.ToLower(resourceType) == "chute" && idx != 3 {
+			if (strings.ToLower(resourceType) == "chute" || strings.ToLower(resourceType) == "chutes") && idx != 3 {
 				continue
 			}
-			if strings.ToLower(resourceType) == "carousel" && idx != 4 {
+			if (strings.ToLower(resourceType) == "carousel" || strings.ToLower(resourceType) == "carousels") && idx != 4 {
 				continue
 			}
 		}
 
-		for _, r := range allocMap {
+		r := allocMap.Head
+		for r != nil {
 
 			//If a specific resource has been requested, ignore the rest
 			if resource != "" && r.Resource.Name != resource {
+				r = r.NextNode
 				continue
 			}
 
-			mapp := allocMap[r.Resource.Name]
-			for _, v := range mapp.FlightAllocationsMap {
+			list := r.FlightAllocationsList
+
+			v := list.Head
+
+			for v != nil {
 
 				test := false
 
@@ -233,19 +239,23 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 				}
 
 				if !test {
+					v = v.NextNode
 					continue
 				}
 
 				if v.To.Before(fromTime) {
+					v = v.NextNode
 					continue
 				}
 
 				if v.From.After(toTime) {
+					v = v.NextNode
 					continue
 				}
 
 				if updatedSinceErr == nil {
 					if v.LastUpdate.Before(updatedSinceTime) {
+						v = v.NextNode
 						continue
 					}
 				}
@@ -259,13 +269,14 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 						AircraftType:         v.AircraftType,
 						AircraftRegistration: v.AircraftRegistration,
 						LastUpdate:           v.LastUpdate},
-					ResourceType: mapp.Resource.ResourceTypeCode,
-					Name:         mapp.Resource.Name,
-					Area:         mapp.Resource.Area,
+					ResourceType: r.Resource.ResourceTypeCode,
+					Name:         r.Resource.Name,
+					Area:         r.Resource.Area,
 				}
 				alloc = append(alloc, n)
+				v = v.NextNode
 			}
-
+			r = r.NextNode
 		}
 	}
 
@@ -328,7 +339,7 @@ func getConfiguredResources(c *gin.Context) {
 		response.ResourceType = "All Resources"
 	}
 
-	if resourceType != "" && !strings.Contains(strings.ToLower("Checkin Gate Stand Carousel Chute"), strings.ToLower(resourceType)) {
+	if resourceType != "" && !strings.Contains(strings.ToLower("Checkin Gate Stand Carousel Chute Checkins Gates Stands Carousels Chutes"), strings.ToLower(resourceType)) {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": "Invalid resouce type specified. "})
 		return
 	}
@@ -363,45 +374,46 @@ func getConfiguredResources(c *gin.Context) {
 
 	var alloc = []ConfiguredResourceResponseItem{}
 
-	allocMaps := []map[string]ResourceAllocationMap{
-		GetRepo(apt).CheckInAllocationMap,
-		GetRepo(apt).GateAllocationMap,
-		GetRepo(apt).StandAllocationMap,
-		GetRepo(apt).ChuteAllocationMap,
-		GetRepo(apt).CarouselAllocationMap}
+	repo := GetRepo(apt)
+	allocMaps := []ResourceLinkedList{
+		repo.CheckInList,
+		repo.GateList,
+		repo.StandList,
+		repo.ChuteList,
+		repo.CarouselList}
 
 	for idx, allocMap := range allocMaps {
 
 		//If a resource type has been specified, ignore the rest
 		if resourceType != "" {
-			if resourceType == "Checkin" && idx != 0 {
+			if (strings.ToLower(resourceType) == "checkin" || strings.ToLower(resourceType) == "checkins") && idx != 0 {
 				continue
 			}
-			if resourceType == "Gate" && idx != 1 {
+			if (strings.ToLower(resourceType) == "gate" || strings.ToLower(resourceType) == "gates") && idx != 1 {
 				continue
 			}
-			if resourceType == "Stand" && idx != 2 {
+			if (strings.ToLower(resourceType) == "stand" || strings.ToLower(resourceType) == "stands") && idx != 2 {
 				continue
 			}
-			if resourceType == "Chute" && idx != 3 {
+			if (strings.ToLower(resourceType) == "chute" || strings.ToLower(resourceType) == "chutes") && idx != 3 {
 				continue
 			}
-			if resourceType == "Carousel" && idx != 4 {
+			if (strings.ToLower(resourceType) == "carousel" || strings.ToLower(resourceType) == "carousels") && idx != 4 {
 				continue
 			}
 		}
 
-		for _, r := range allocMap {
+		struc := allocMap.Head
 
-			mapp := allocMap[r.Resource.Name]
+		for struc != nil {
 
 			n := ConfiguredResourceResponseItem{
-				ResourceTypeCode: mapp.Resource.ResourceTypeCode,
-				Name:             mapp.Resource.Name,
-				Area:             mapp.Resource.Area,
+				ResourceTypeCode: struc.Resource.ResourceTypeCode,
+				Name:             struc.Resource.Name,
+				Area:             struc.Resource.Area,
 			}
 			alloc = append(alloc, n)
-
+			struc = struc.NextNode
 		}
 	}
 

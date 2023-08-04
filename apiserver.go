@@ -202,43 +202,42 @@ func metricsReport(c *gin.Context) {
 
 	repo := GetRepo(apt)
 
-	metrics.NumberOfFlights = len(repo.Flights)
-	metrics.NumberOfCheckins = len(repo.CheckInAllocationMap)
+	metrics.NumberOfFlights = repo.FlightLinkedList.Len()
+	metrics.NumberOfCheckins = repo.CheckInList.Len()
 
-	metrics.NumberOfGates = len(repo.GateAllocationMap)
-	metrics.NumberOfStands = len(repo.StandAllocationMap)
-	metrics.NumberOfCarousels = len(repo.CarouselAllocationMap)
-	metrics.NumberOfChutes = len(repo.ChuteAllocationMap)
+	metrics.NumberOfGates = repo.GateList.Len()
+	metrics.NumberOfStands = repo.StandList.Len()
+	metrics.NumberOfCarousels = repo.CarouselList.Len()
+	metrics.NumberOfChutes = repo.ChuteList.Len()
+	// n := 0
+	// for _, m := range repo.CheckInList {
+	// 	n = n + len(m.FlightAllocationsArray)
+	// }
+	// metrics.NumberOfCheckinAllocations = n
 
-	n := 0
-	for _, m := range repo.CheckInAllocationMap {
-		n = n + len(m.FlightAllocationsMap)
-	}
-	metrics.NumberOfCheckinAllocations = n
+	// n = 0
+	// for _, m := range repo.GateList {
+	// 	n = n + len(m.FlightAllocationsArray)
+	// }
+	// metrics.NumberOfGateAllocations = n
 
-	n = 0
-	for _, m := range repo.GateAllocationMap {
-		n = n + len(m.FlightAllocationsMap)
-	}
-	metrics.NumberOfGateAllocations = n
+	// n = 0
+	// for _, m := range repo.StandList {
+	// 	n = n + len(m.FlightAllocationsArray)
+	// }
+	// metrics.NumberOfStandAllocations = n
 
-	n = 0
-	for _, m := range repo.StandAllocationMap {
-		n = n + len(m.FlightAllocationsMap)
-	}
-	metrics.NumberOfStandAllocations = n
+	// n = 0
+	// for _, m := range repo.CarouselList {
+	// 	n = n + len(m.FlightAllocationsArray)
+	// }
+	// metrics.NumberOfCarouselAllocations = n
 
-	n = 0
-	for _, m := range repo.CarouselAllocationMap {
-		n = n + len(m.FlightAllocationsMap)
-	}
-	metrics.NumberOfCarouselAllocations = n
-
-	n = 0
-	for _, m := range repo.ChuteAllocationMap {
-		n = n + len(m.FlightAllocationsMap)
-	}
-	metrics.NumberOfChuteAllocations = n
+	// n = 0
+	// for _, m := range repo.ChuteList {
+	// 	n = n + len(m.FlightAllocationsArray)
+	// }
+	// metrics.NumberOfChuteAllocations = n
 
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)

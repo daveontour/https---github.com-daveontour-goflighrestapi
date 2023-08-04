@@ -51,6 +51,8 @@ var flightCreatedChannel = make(chan Flight)
 var flightDeletedChannel = make(chan Flight)
 var flightsInitChannel = make(chan int)
 
+var xx = 0
+
 var schedulerMap = make(map[string]*gocron.Scheduler)
 var refreshSchedulerMap = make(map[string]*gocron.Scheduler)
 
