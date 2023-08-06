@@ -2,17 +2,12 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
-
-	//"runtime"
-
 	"time"
 
 	"github.com/go-co-op/gocron"
@@ -58,7 +53,11 @@ func GetRepo(airportCode string) *Repository {
 func InitRepositories() {
 
 	var repos Repositories
-	json.Unmarshal([]byte(readBytesFromFile("airports.json")), &repos)
+
+	err := airportsViper.Unmarshal(&repos)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	for _, v := range repos.Repositories {
 		repoList = append(repoList, v)
@@ -69,7 +68,8 @@ func InitRepositories() {
 func reInitAirport(aptCode string) {
 
 	var repos Repositories
-	json.Unmarshal([]byte(readBytesFromFile("airports.json")), &repos)
+	airportsViper.ReadInConfig()
+	airportsViper.Unmarshal(&repos)
 
 	for _, v := range repos.Repositories {
 		if v.AMSAirport != aptCode {
@@ -174,37 +174,33 @@ Reconnect:
 	for {
 
 		queue, err := queueInfo.Open(msmq.Receive, msmq.DenyNone)
+		if err != nil {
+			logger.Error(err)
+			continue Reconnect
+		}
 
 		for {
 
-			if err != nil {
-				log.Fatal(err)
-				continue Reconnect
-			}
-
 			msg, err := queue.Receive() //This call blocks until a message is available
 			if err != nil {
-				log.Fatal(err)
-				//queue.Close()
+				logger.Error(err)
 				continue Reconnect
 			}
 
 			message, _ := msg.Body()
 
-			fmt.Printf("Received Message length %d\n", len(message))
+			logger.Debug(fmt.Sprintf("Received Message length %d\n", len(message)))
+
 			if strings.Contains(message, "FlightUpdatedNotification") {
-				updateFlightEntry(message)
-				//queue.Close()
+				go updateFlightEntry(message)
 				continue
 			}
 			if strings.Contains(message, "FlightCreatedNotification") {
-				createFlightEntry(message)
-				//queue.Close()
+				go createFlightEntry(message)
 				continue
 			}
 			if strings.Contains(message, "FlightDeletedNotification") {
-				deleteFlightEntry(message)
-				//queue.Close()
+				go deleteFlightEntry(message)
 				continue
 			}
 		}
@@ -215,7 +211,7 @@ func scheduleUpdates(airportCode string) {
 	// Schedule the regular refresh
 
 	today := time.Now().Format("2006-01-02")
-	startTimeStr := today + "T" + serviceConfig.ScheduleUpdateJob
+	startTimeStr := today + "T" + configViper.GetString("ScheduleUpdateJob")
 	startTime, _ := time.ParseInLocation("2006-01-02T15:04:05", startTimeStr, loc)
 
 	s := gocron.NewScheduler(time.Local)
@@ -223,12 +219,12 @@ func scheduleUpdates(airportCode string) {
 	refreshSchedulerMap[airportCode] = s
 
 	// Schedule the regular update of the repositoiry
-	s.Every(serviceConfig.ScheduleUpdateJobIntervalInHours).Hours().StartAt(startTime).Do(func() { updateRepository(airportCode) })
+	s.Every(configViper.GetString("ScheduleUpdateJobIntervalInHours")).Hours().StartAt(startTime).Do(func() { updateRepository(airportCode) })
 
 	// Kick off an intial load on startup
 	s.Every(1).Millisecond().LimitRunsTo(1).Do(func() { loadRepositoryOnStartup(airportCode) })
 
-	logger.Info(fmt.Sprintf("Regular updates of the repository have been scheduled at %s for every %v hours", startTimeStr, serviceConfig.ScheduleUpdateJobIntervalInHours))
+	logger.Info(fmt.Sprintf("Regular updates of the repository have been scheduled at %s for every %v hours", startTimeStr, configViper.GetString("ScheduleUpdateJobIntervalInHours")))
 
 	s.StartBlocking()
 }
@@ -257,7 +253,7 @@ func updateRepository(airportCode string) {
 
 	logger.Info(fmt.Sprintf("Scheduled Maintenance of Repository: %s. Getting flights. Chunk Size: %v days", airportCode, chunkSize))
 
-	for min := GetRepo(airportCode).WindowMinInDaysFromNow; min <= GetRepo(airportCode).WindowMaxInDaysFromNow; min += chunkSize {
+	for min := GetRepo(airportCode).FlightSDOWindowMinimumInDaysFromNow; min <= GetRepo(airportCode).FlightSDOWindowMaximumInDaysFromNow; min += chunkSize {
 		var envel Envelope
 		xml.Unmarshal(getFlights(airportCode, min, min+chunkSize), &envel)
 
@@ -274,8 +270,8 @@ func updateRepository(airportCode string) {
 		flightsInitChannel <- len(envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight)
 	}
 
-	from := time.Now().AddDate(0, 0, repo.WindowMinInDaysFromNow)
-	to := time.Now().AddDate(0, 0, repo.WindowMaxInDaysFromNow)
+	from := time.Now().AddDate(0, 0, repo.FlightSDOWindowMinimumInDaysFromNow)
+	to := time.Now().AddDate(0, 0, repo.FlightSDOWindowMaximumInDaysFromNow)
 
 	fmt.Printf("Got flights set from %s to %s\n", from, to)
 
@@ -307,11 +303,11 @@ func updateFlightEntry(message string) {
 
 	sdot := flight.GetSDO()
 
-	if sdot.Before(time.Now().AddDate(0, 0, repo.WindowMinInDaysFromNow-2)) {
+	if sdot.Before(time.Now().AddDate(0, 0, repo.FlightSDOWindowMinimumInDaysFromNow-2)) {
 		logger.Debugf("Update for Flight Before Window. Flight ID: %s", flight.GetFlightID())
 		return
 	}
-	if sdot.After(time.Now().AddDate(0, 0, repo.WindowMaxInDaysFromNow+2)) {
+	if sdot.After(time.Now().AddDate(0, 0, repo.FlightSDOWindowMaximumInDaysFromNow+2)) {
 		logger.Debugf("Update for Flight After Window. Flight ID: %s", flight.GetFlightID())
 		return
 	}
@@ -339,11 +335,11 @@ func createFlightEntry(message string) {
 	repo := GetRepo(airportCode)
 	sdot := flight.GetSDO()
 
-	if sdot.Before(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMinInDaysFromNow-2)) {
+	if sdot.Before(time.Now().AddDate(0, 0, GetRepo(airportCode).FlightSDOWindowMinimumInDaysFromNow-2)) {
 		log.Println("Create for Flight Before Window")
 		return
 	}
-	if sdot.After(time.Now().AddDate(0, 0, GetRepo(airportCode).WindowMaxInDaysFromNow+2)) {
+	if sdot.After(time.Now().AddDate(0, 0, GetRepo(airportCode).FlightSDOWindowMaximumInDaysFromNow+2)) {
 		log.Println("Create for Flight After Window")
 		return
 	}
@@ -376,10 +372,9 @@ func deleteFlightEntry(message string) {
 func getFlights(airportCode string, values ...int) []byte {
 
 	repo := GetRepo(airportCode)
-	from := time.Now().AddDate(0, 0, repo.WindowMinInDaysFromNow).Format("2006-01-02")
-	to := time.Now().AddDate(0, 0, repo.WindowMaxInDaysFromNow+1).Format("2006-01-02")
+	from := time.Now().AddDate(0, 0, repo.FlightSDOWindowMinimumInDaysFromNow).Format("2006-01-02")
+	to := time.Now().AddDate(0, 0, repo.FlightSDOWindowMaximumInDaysFromNow+1).Format("2006-01-02")
 
-	fmt.Printf("Getting flights from %s to %s\n", from, to)
 	// Change the window based on optional inout parameters
 	if len(values) >= 1 {
 		from = time.Now().AddDate(0, 0, values[0]).Format("2006-01-02")
@@ -391,6 +386,7 @@ func getFlights(airportCode string, values ...int) []byte {
 	}
 
 	logger.Debug(fmt.Sprintf("Getting flight from %s to %s", from, to))
+	fmt.Printf("Getting flights from %s to %s\n", from, to)
 
 	queryBody := fmt.Sprintf(xmlBody, repo.AMSToken, from, to, repo.AMSAirport)
 	bodyReader := bytes.NewReader([]byte(queryBody))
@@ -562,7 +558,7 @@ func getResource(airportCode string, resourceType string) []byte {
 		return nil
 	}
 
-	resBody, err := ioutil.ReadAll(res.Body)
+	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
 		logger.Error(fmt.Sprintf("Get Resource Client: could not read response body: %s\n", err))
 		return nil

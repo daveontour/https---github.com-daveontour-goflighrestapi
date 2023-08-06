@@ -6,10 +6,10 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
+	"io"
+
 	"math/big"
 	"net/http"
 	"os"
@@ -23,7 +23,7 @@ import (
 func startGinServer() {
 
 	mode := gin.ReleaseMode
-	if serviceConfig.DebugService {
+	if configViper.GetBool("DebugService") {
 		mode = gin.DebugMode
 	}
 	gin.SetMode(mode)
@@ -33,7 +33,7 @@ func startGinServer() {
 	// Configure all the endpoints for the HTTP Server
 
 	// Test purposes only to just printout whatever was received by the server
-	if serviceConfig.TestHTTPServer {
+	if configViper.GetBool("TestHTTPServer") {
 		router.POST("/test", testQuery)
 	}
 	router.GET("/getFlights/:apt", getRequestedFlightsAPI)
@@ -81,43 +81,43 @@ func startGinServer() {
 		_, _ = c.Writer.Write(data)
 	})
 
-	router.GET("/memTest", func(c *gin.Context) {
-		i := 0
-		for {
-			response, _ := getRequestedFlightsCommon("AUH", "", "", "", "", "", "", "default", nil, []ParameterValuePair{})
-			j, _ := json.Marshal(response)
-			fmt.Printf("Iteration %v, Length %v\n", i, len(j))
-			i++
-		}
-	})
+	// router.GET("/memTest", func(c *gin.Context) {
+	// 	i := 0
+	// 	for {
+	// 		response, _ := getRequestedFlightsCommon("AUH", "", "", "", "", "", "", "default", nil, []ParameterValuePair{})
+	// 		j, _ := json.Marshal(response)
+	// 		fmt.Printf("Iteration %v, Length %v\n", i, len(j))
+	// 		i++
+	// 	}
+	// })
 
 	// Start it up with the configured security mode
-	if !serviceConfig.UseHTTPS && !serviceConfig.UseHTTPSUntrusted {
+	if !configViper.GetBool("UseHTTPS") && !configViper.GetBool("UseHTTPSUntrusted") {
 
-		err := router.Run(serviceConfig.ServiceIPPort)
+		err := router.Run(configViper.GetString("ServiceIPPort"))
 		if err != nil {
 			logger.Fatal("Unable to start HTTP server.")
 			wg.Done()
 			os.Exit(2)
 		}
 
-	} else if serviceConfig.UseHTTPS && serviceConfig.KeyFile != "" && serviceConfig.CertFile != "" {
+	} else if configViper.GetBool("UseHTTPS") && configViper.GetString("KeyFile") != "" && configViper.GetString("CertFile") != "" {
 
-		server := http.Server{Addr: serviceConfig.ServiceIPPort, Handler: router}
-		err := server.ListenAndServeTLS(serviceConfig.CertFile, serviceConfig.KeyFile)
+		server := http.Server{Addr: configViper.GetString("ServiceIPPort"), Handler: router}
+		err := server.ListenAndServeTLS(configViper.GetString("CertFile"), configViper.GetString("KeyFile"))
 		if err != nil {
 			logger.Fatal("Unable to start HTTPS server. Likely cause is that the keyFile or certFile were not found")
 			wg.Done()
 			os.Exit(2)
 		}
 
-	} else if serviceConfig.UseHTTPS && (serviceConfig.KeyFile == "" && serviceConfig.CertFile == "") {
+	} else if configViper.GetBool("UseHTTPS") && (configViper.GetString("KeyFile") == "" && configViper.GetString("CertFile") == "") {
 
 		logger.Fatal("Unable to start HTTPS server. Trusted HTTPS was configured but The keyFile or certFile were not configured")
 		wg.Done()
 		os.Exit(2)
 
-	} else if serviceConfig.UseHTTPSUntrusted {
+	} else if configViper.GetBool("UseHTTPSUntruste") {
 
 		cert := &x509.Certificate{
 			SerialNumber: big.NewInt(1658),
@@ -148,7 +148,7 @@ func startGinServer() {
 		x509Cert, _ := tls.X509KeyPair(certBytes, keyBytes)
 
 		tlsConfig := &tls.Config{Certificates: []tls.Certificate{x509Cert}}
-		server := http.Server{Addr: serviceConfig.ServiceIPPort, Handler: router, TLSConfig: tlsConfig}
+		server := http.Server{Addr: configViper.GetString("ServiceIPPort"), Handler: router, TLSConfig: tlsConfig}
 
 		err := server.ListenAndServeTLS("", "")
 		if err != nil {
@@ -165,7 +165,7 @@ func hasAdminToken(c *gin.Context) bool {
 	if keys == nil {
 		return false
 	}
-	if keys[0] == serviceConfig.AdminToken {
+	if keys[0] == configViper.GetString("AdminToken") {
 		return true
 	} else {
 		return false
@@ -202,48 +202,24 @@ func metricsReport(c *gin.Context) {
 
 	repo := GetRepo(apt)
 
-	metrics.NumberOfFlights = repo.FlightLinkedList.Len()
-	metrics.NumberOfCheckins = repo.CheckInList.Len()
+	metrics.NumberOfFlights = (*repo).FlightLinkedList.Len()
+	metrics.NumberOfCheckins = (*repo).CheckInList.Len()
 
-	metrics.NumberOfGates = repo.GateList.Len()
-	metrics.NumberOfStands = repo.StandList.Len()
-	metrics.NumberOfCarousels = repo.CarouselList.Len()
-	metrics.NumberOfChutes = repo.ChuteList.Len()
-	// n := 0
-	// for _, m := range repo.CheckInList {
-	// 	n = n + len(m.FlightAllocationsArray)
-	// }
-	// metrics.NumberOfCheckinAllocations = n
+	metrics.NumberOfGates = (*repo).GateList.Len()
+	metrics.NumberOfStands = (*repo).StandList.Len()
+	metrics.NumberOfCarousels = (*repo).CarouselList.Len()
+	metrics.NumberOfChutes = (*repo).ChuteList.Len()
 
-	// n = 0
-	// for _, m := range repo.GateList {
-	// 	n = n + len(m.FlightAllocationsArray)
-	// }
-	// metrics.NumberOfGateAllocations = n
-
-	// n = 0
-	// for _, m := range repo.StandList {
-	// 	n = n + len(m.FlightAllocationsArray)
-	// }
-	// metrics.NumberOfStandAllocations = n
-
-	// n = 0
-	// for _, m := range repo.CarouselList {
-	// 	n = n + len(m.FlightAllocationsArray)
-	// }
-	// metrics.NumberOfCarouselAllocations = n
-
-	// n = 0
-	// for _, m := range repo.ChuteList {
-	// 	n = n + len(m.FlightAllocationsArray)
-	// }
-	// metrics.NumberOfChuteAllocations = n
+	metrics.NumberOfCheckinAllocations = (*repo).CheckInList.NumberOfFlightAllocations()
+	metrics.NumberOfStandAllocations = (*repo).StandList.NumberOfFlightAllocations()
+	metrics.NumberOfGateAllocations = (*repo).GateList.NumberOfFlightAllocations()
+	metrics.NumberOfCarouselAllocations = (*repo).CarouselList.NumberOfFlightAllocations()
+	metrics.NumberOfChuteAllocations = (*repo).ChuteList.NumberOfFlightAllocations()
 
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
 
 	metrics.MemAllocMB = int(m.Alloc / 1024 / 1024)
-
 	metrics.MemSysMB = int(m.Sys / 1024 / 1024)
 	metrics.MemTotaAllocMB = int(m.TotalAlloc / 1024 / 1024)
 	metrics.MemHeapAllocMB = int(m.HeapAlloc / 1024 / 1024)
@@ -304,31 +280,6 @@ func getUserProfile(c *gin.Context, userToken string) UserProfile {
 
 	defer exeTime("Getting User Profile")()
 
-	//Read read the file for each request so changes can be made without the need to restart the server
-
-	// ex, err := os.Executable()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// exPath := filepath.Dir(ex)
-
-	//fileContent, err := os.Open(filepath.Join(exPath, "users.json"))
-	// fileContent, err := os.Open("users.json")
-
-	// if err != nil {
-	// 	logger.Error("Error Reading " + filepath.Join(exPath, "users.json"))
-	// 	logger.Error(err.Error())
-	// 	return UserProfile{}
-	// }
-
-	// defer fileContent.Close()
-
-	byteResult := readBytesFromFile("users.json")
-
-	var users Users
-
-	json.Unmarshal([]byte(byteResult), &users)
-
 	key := userToken
 
 	if c != nil {
@@ -340,9 +291,10 @@ func getUserProfile(c *gin.Context, userToken string) UserProfile {
 		}
 
 	}
+	users := getUserProfiles()
 	userProfile := UserProfile{}
 
-	for _, u := range users.Users {
+	for _, u := range users {
 		if key == u.Key {
 			userProfile = u
 			break
@@ -357,7 +309,7 @@ func getUserProfile(c *gin.Context, userToken string) UserProfile {
 func testQuery(c *gin.Context) {
 	if logger.Level == logrus.TraceLevel {
 		logger.Info("Received message on test HTTP Server")
-		jsonData, _ := ioutil.ReadAll(c.Request.Body)
+		jsonData, _ := io.ReadAll(c.Request.Body)
 		fmt.Println(string(jsonData[:]))
 	} else {
 		logger.Info("Received message on test HTTP Server")

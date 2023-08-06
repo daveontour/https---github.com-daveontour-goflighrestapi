@@ -61,27 +61,27 @@ type PropertyValuePair struct {
 	PropertyName string `xml:"propertyName,attr"`
 }
 
-type ServiceConfig struct {
-	ServiceName                      string `json:"ServiceName"`
-	ServicDisplayName                string `json:"ServiceDisplayName"`
-	ServiceDescription               string `json:"ServiceDescription"`
-	ServiceIPPort                    string `json:"ServiceIPport"`
-	ScheduleUpdateJob                string `json:"ScheduleUpdateJob"`
-	ScheduleUpdateJobIntervalInHours int    `json:"ScheduleUpdateJobIntervalInHours"`
-	DebugService                     bool   `json:"DebugService"`
-	UseHTTPS                         bool   `json:"UseHTTPS"`
-	UseHTTPSUntrusted                bool   `json:"UseHTTPSUntrusted"`
-	KeyFile                          string `json:"KeyFile"`
-	CertFile                         string `json:"CertFile"`
-	TestHTTPServer                   bool   `json:"TestHTTPServer"`
-	LogFile                          string `json:"LogFile"`
-	RequestLogFile                   string `json:"RequestLogFile"`
-	MaxLogFileSizeInMB               int    `json:"MaxLogFileSizeInMB"`
-	MaxNumberLogFiles                int    `json:"MaxNumberLogFiles"`
-	EnableMetrics                    bool   `json:"EnableMetrics"`
-	MetricsLogFile                   string `json:"MetricsLogFile"`
-	AdminToken                       string `json:"AdminToken"`
-}
+// type ServiceConfig struct {
+// 	ServiceName                      string `json:"ServiceName"`
+// 	ServicDisplayName                string `json:"ServiceDisplayName"`
+// 	ServiceDescription               string `json:"ServiceDescription"`
+// 	ServiceIPPort                    string `json:"ServiceIPport"`
+// 	ScheduleUpdateJob                string `json:"ScheduleUpdateJob"`
+// 	ScheduleUpdateJobIntervalInHours int    `json:"ScheduleUpdateJobIntervalInHours"`
+// 	DebugService                     bool   `json:"DebugService"`
+// 	UseHTTPS                         bool   `json:"UseHTTPS"`
+// 	UseHTTPSUntrusted                bool   `json:"UseHTTPSUntrusted"`
+// 	KeyFile                          string `json:"KeyFile"`
+// 	CertFile                         string `json:"CertFile"`
+// 	TestHTTPServer                   bool   `json:"TestHTTPServer"`
+// 	LogFile                          string `json:"LogFile"`
+// 	RequestLogFile                   string `json:"RequestLogFile"`
+// 	MaxLogFileSizeInMB               int    `json:"MaxLogFileSizeInMB"`
+// 	MaxNumberLogFiles                int    `json:"MaxNumberLogFiles"`
+// 	EnableMetrics                    bool   `json:"EnableMetrics"`
+// 	MetricsLogFile                   string `json:"MetricsLogFile"`
+// 	AdminToken                       string `json:"AdminToken"`
+// }
 
 type MetricsReport struct {
 	Airport                     string
@@ -159,15 +159,15 @@ type Users struct {
 }
 
 type Repository struct {
-	AMSAirport                string `json:"AMSAirport"`
-	AMSSOAPServiceURL         string `json:"AMSSOAPServiceURL"`
-	AMSRestServiceURL         string `json:"AMSRestServiceURL"`
-	AMSToken                  string `json:"AMSToken"`
-	WindowMinInDaysFromNow    int    `json:"FlightSDOWindowMinimumInDaysFromNow"`
-	WindowMaxInDaysFromNow    int    `json:"FlightSDOWindowMaximumInDaysFromNow"`
-	ListenerType              string `json:"ListenerType"`
-	NotificationListenerQueue string `json:"NotificationListenerQueue"`
-	LoadFlightChunkSizeInDays int    `json:"LoadFlightChunkSizeInDays"`
+	AMSAirport                          string `json:"AMSAirport"`
+	AMSSOAPServiceURL                   string `json:"AMSSOAPServiceURL"`
+	AMSRestServiceURL                   string `json:"AMSRestServiceURL"`
+	AMSToken                            string `json:"AMSToken"`
+	FlightSDOWindowMinimumInDaysFromNow int    `json:"FlightSDOWindowMinimumInDaysFromNow"`
+	FlightSDOWindowMaximumInDaysFromNow int    `json:"FlightSDOWindowMaximumInDaysFromNow"`
+	ListenerType                        string `json:"ListenerType"`
+	NotificationListenerQueue           string `json:"NotificationListenerQueue"`
+	LoadFlightChunkSizeInDays           int    `json:"LoadFlightChunkSizeInDays"`
 	//Flights                   []Flight
 	FlightLinkedList  FlightLinkedList
 	CurrentLowerLimit time.Time

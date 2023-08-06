@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -29,32 +27,13 @@ func CleanJSON(sb strings.Builder) string {
 
 	return s
 }
-func readBytesFromFile(filename string) (byteResult []byte) {
-	_, err := os.Executable()
-	if err != nil {
-		panic(err)
-	}
-	//exPath := filepath.Dir(ex)
-	//fileContent, err := os.Open(filepath.Join(exPath, filename))
-
-	fileContent, err := os.Open(filepath.Join("C:\\Users\\dave_\\OneDrive\\GoProjects\\github.com\\daveontour\\getflightsrestapi\\", filename))
-	if err != nil {
-		logger.Fatal(err)
-		return
-	}
-
-	defer fileContent.Close()
-
-	byteResult, _ = io.ReadAll(fileContent)
-
-	return
-}
 
 func getUserProfiles() []UserProfile {
 
 	var users Users
-
-	json.Unmarshal([]byte(readBytesFromFile("users.json")), &users)
+	if err := userViper.Unmarshal(&users); err != nil {
+		return nil
+	}
 
 	return users.Users
 }
@@ -145,6 +124,13 @@ type ResourceLinkedList struct {
 	Tail *ResourceAllocationStruct
 }
 
+func (ll *ResourceLinkedList) AddNodes(nodes []FixedResource) {
+	for _, node := range nodes {
+		newNode := ResourceAllocationStruct{Resource: node}
+		ll.AddNode(newNode)
+	}
+}
+
 // AddNode adds a new node to the end of the doubly linked list.
 func (ll *ResourceLinkedList) AddNode(newNode ResourceAllocationStruct) {
 
@@ -159,13 +145,6 @@ func (ll *ResourceLinkedList) AddNode(newNode ResourceAllocationStruct) {
 
 	if ll.Head == nil {
 		ll.Head = &newNode
-	}
-}
-
-func (ll *ResourceLinkedList) AddNodes(nodes []FixedResource) {
-	for _, node := range nodes {
-		newNode := ResourceAllocationStruct{Resource: node}
-		ll.AddNode(newNode)
 	}
 }
 
@@ -210,6 +189,16 @@ func (ll *ResourceLinkedList) RemoveFlightAllocation(flightID string) {
 		currentNode.FlightAllocationsList.RemoveFlightAllocations(flightID)
 		currentNode = currentNode.NextNode
 	}
+}
+
+func (ll *ResourceLinkedList) NumberOfFlightAllocations() (n int) {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		n = n + currentNode.FlightAllocationsList.Len()
+		currentNode = currentNode.NextNode
+	}
+	return
 }
 
 func (ll *ResourceLinkedList) AddAllocation(node AllocationItem) {

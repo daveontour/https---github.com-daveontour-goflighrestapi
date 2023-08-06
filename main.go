@@ -1,130 +1,26 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
-	"flag"
-
-	//"log"
-	//"github.com/fsnotify/fsnotify"
-	"github.com/go-co-op/gocron"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
-	easy "github.com/t-tomalak/logrus-easy-formatter"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
 	"golang.org/x/sys/windows/svc/mgr"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
-
-// var repoMap = make(map[string]Repository)
-var repoList []Repository
-var wg sync.WaitGroup
-
-var mapMutex = &sync.RWMutex{}
-var serviceConfig ServiceConfig
-var isDebug bool = false
-
-var logger = logrus.New()
-var requestLogger = logrus.New()
-var metricsLogger = logrus.New()
-
-const layout = "2006-01-02T15:04:05"
-
-var loc *time.Location
-
-const UpdateAction = "UPDATE"
-const CreateAction = "CREATE"
-const DeleteAction = "DELETE"
-const StatusAction = "STATUS"
-
-var repositoryUpdateChannel = make(chan int)
-var flightUpdatedChannel = make(chan Flight)
-var flightCreatedChannel = make(chan Flight)
-var flightDeletedChannel = make(chan Flight)
-var flightsInitChannel = make(chan int)
-
-var xx = 0
-
-var schedulerMap = make(map[string]*gocron.Scheduler)
-var refreshSchedulerMap = make(map[string]*gocron.Scheduler)
-
-var userChangeSubscriptions []UserChangeSubscription
-var userChangeSubscriptionsMutex = &sync.RWMutex{}
-
-var reservedParameters = []string{"airport", "airline", "al", "from", "to", "direction", "d", "route", "r", "sort"}
 
 func main() {
 
-	loc, _ = time.LoadLocation("Local")
-	serviceConfig = getServiceConfig()
-	svcName := serviceConfig.ServiceName
-	isDebug = serviceConfig.DebugService
-	logger.Formatter = &easy.Formatter{
-		TimestampFormat: "2006-01-02 15:04:05",
-		LogFormat:       "[%lvl%]: %time% - %msg%\n",
-	}
-	if serviceConfig.LogFile != "" {
-		logger.SetOutput(&lumberjack.Logger{
-			Filename:   serviceConfig.LogFile,
-			MaxSize:    serviceConfig.MaxLogFileSizeInMB, // megabytes
-			MaxBackups: serviceConfig.MaxNumberLogFiles,
-			MaxAge:     28,   //days
-			Compress:   true, // disabled by default
-		})
-	}
-	requestLogger.Formatter = &easy.Formatter{
-		TimestampFormat: "2006-01-02 15:04:05",
-		LogFormat:       "[%lvl%]: %time% - %msg%\n",
-	}
-	if serviceConfig.RequestLogFile != "" {
-		requestLogger.SetOutput(&lumberjack.Logger{
-			Filename:   serviceConfig.RequestLogFile,
-			MaxSize:    serviceConfig.MaxLogFileSizeInMB, // megabytes
-			MaxBackups: serviceConfig.MaxNumberLogFiles,
-			MaxAge:     28,   //days
-			Compress:   true, // disabled by default
-		})
-	}
+	initGlobals()
 
-	metricsLogger.Formatter = &easy.Formatter{
-		TimestampFormat: "2006-01-02 15:04:05.000000",
-		LogFormat:       "[%lvl%]: %time% - %msg%\n",
-	}
-	if serviceConfig.MetricsLogFile != "" {
-		metricsLogger.SetOutput(&lumberjack.Logger{
-			Filename:   serviceConfig.MetricsLogFile,
-			MaxSize:    serviceConfig.MaxLogFileSizeInMB, // megabytes
-			MaxBackups: serviceConfig.MaxNumberLogFiles,
-			MaxAge:     28,   //days
-			Compress:   true, // disabled by default
-		})
-
-	}
-	if serviceConfig.EnableMetrics {
-		metricsLogger.SetLevel(logrus.InfoLevel)
-	} else {
-		metricsLogger.SetLevel(logrus.ErrorLevel)
-	}
-
-	logger.SetLevel(logrus.InfoLevel)
-	requestLogger.SetLevel(logrus.InfoLevel)
-
-	if isDebug {
-		logger.SetLevel(logrus.DebugLevel)
-	}
-
-	flag.StringVar(&svcName, "name", svcName, "name of the service")
-	flag.Parse()
-
+	svcName := configViper.GetString("ServiceName")
 	inService, err := svc.IsWindowsService()
+
 	if err != nil {
 		log.Fatalf("failed to determine if we are running in service: %v", err)
 	}
@@ -145,23 +41,16 @@ func main() {
 		runService(svcName, true)
 		return
 	case "install":
-		err = installService(svcName, serviceConfig.ServicDisplayName, serviceConfig.ServiceDescription)
+		err = installService(svcName, configViper.GetString("ServicDisplayName"), configViper.GetString("ServiceDescription"))
 	case "remove":
 		err = removeService(svcName)
 	case "start":
 		err = startService(svcName)
 	case "stop":
 		err = controlService(svcName, svc.Stop, svc.Stopped)
-	case "pause":
-		err = controlService(svcName, svc.Pause, svc.Paused)
-	case "continue":
-		err = controlService(svcName, svc.Continue, svc.Running)
 	default:
 		splash()
 		runService(svcName, true)
-		//splash()
-		//usage(fmt.Sprintf("invalid command %s", cmd))
-		//os.Exit(2)
 	}
 	if err != nil {
 		log.Fatalf("failed to %s %s: %v", cmd, svcName, err)
@@ -173,7 +62,7 @@ func usage(errmsg string) {
 	fmt.Fprintf(os.Stderr,
 		"usage: %s <command>\n"+
 			"       where <command> is one of\n"+
-			"       install, remove, debug, start, stop, pause or continue.\n",
+			"       install, remove, debug, start, stop\n",
 		os.Args[0])
 }
 
@@ -197,21 +86,6 @@ func splash() {
 	fmt.Println("*                                                     *")
 	fmt.Println("*******************************************************")
 	fmt.Println()
-}
-func getServiceConfig() ServiceConfig {
-	// ex, err := os.Executable()
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// exPath := filepath.Dir(ex)
-
-	//fileContent, err := os.Open(filepath.Join(exPath, "service.json"))
-	byteResult := readBytesFromFile("service.json")
-
-	var serviceConfig ServiceConfig
-	json.Unmarshal([]byte(byteResult), &serviceConfig)
-
-	return serviceConfig
 }
 
 func installService(name, displayName, desc string) error {
@@ -249,10 +123,10 @@ func removeService(name string) error {
 		return err
 	}
 
-	serviceConfig := getServiceConfig()
+	//serviceConfig := getServiceConfig()
 
 	defer m.Disconnect()
-	s, err := m.OpenService(serviceConfig.ServiceName)
+	s, err := m.OpenService(configViper.GetString("ServiceName"))
 	if err != nil {
 		return fmt.Errorf("service %s is not installed", name)
 	}
@@ -345,11 +219,6 @@ loop:
 				//Stop the Servers
 				wg.Done()
 				break loop
-			case svc.Pause:
-				changes <- svc.Status{State: svc.Paused, Accepts: cmdsAccepted}
-
-			case svc.Continue:
-				changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
 			default:
 				logger.Error(fmt.Sprintf("unexpected control request #%d", c))
 			}

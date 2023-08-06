@@ -1,5 +1,5 @@
 {
-    "users": [
+    "Users": [
         {
             "Enabled": true,
             "UserName": "Default User",
@@ -97,6 +97,7 @@
         },
         {
             "UserName": "Ground Handler1",
+            "Enabled":true,
             "Key": "12345678",
             "AllowedAirports": [
                 "BAH"
