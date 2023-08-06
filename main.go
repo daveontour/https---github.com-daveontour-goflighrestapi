@@ -7,6 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"flightresourcerestapi/globals"
+	"flightresourcerestapi/repo"
+	"flightresourcerestapi/server"
+	"flightresourcerestapi/timeservice"
+
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
@@ -16,9 +21,10 @@ import (
 
 func main() {
 
-	initGlobals()
+	globals.InitGlobals()
+	timeservice.InitTimeService()
 
-	svcName := configViper.GetString("ServiceName")
+	svcName := globals.ConfigViper.GetString("ServiceName")
 	inService, err := svc.IsWindowsService()
 
 	if err != nil {
@@ -36,12 +42,12 @@ func main() {
 
 	switch cmd {
 	case "debug":
-		isDebug = true
+		globals.IsDebug = true
 		splash()
 		runService(svcName, true)
 		return
 	case "install":
-		err = installService(svcName, configViper.GetString("ServicDisplayName"), configViper.GetString("ServiceDescription"))
+		err = installService(svcName, globals.ConfigViper.GetString("ServicDisplayName"), globals.ConfigViper.GetString("ServiceDescription"))
 	case "remove":
 		err = removeService(svcName)
 	case "start":
@@ -89,7 +95,7 @@ func splash() {
 }
 
 func installService(name, displayName, desc string) error {
-	exepath, err := exePath()
+	exepath, err := globals.ExePath()
 	if err != nil {
 		return err
 	}
@@ -126,7 +132,7 @@ func removeService(name string) error {
 	//serviceConfig := getServiceConfig()
 
 	defer m.Disconnect()
-	s, err := m.OpenService(configViper.GetString("ServiceName"))
+	s, err := m.OpenService(globals.ConfigViper.GetString("ServiceName"))
 	if err != nil {
 		return fmt.Errorf("service %s is not installed", name)
 	}
@@ -214,13 +220,13 @@ loop:
 				// golang.org/x/sys/windows/svc.TestExample is verifying this output.
 				testOutput := strings.Join(args, "-")
 				testOutput += fmt.Sprintf("-%d", c.Context)
-				logger.Debug(testOutput)
+				globals.Logger.Debug(testOutput)
 
 				//Stop the Servers
-				wg.Done()
+				globals.Wg.Done()
 				break loop
 			default:
-				logger.Error(fmt.Sprintf("unexpected control request #%d", c))
+				globals.Logger.Error(fmt.Sprintf("unexpected control request #%d", c))
 			}
 		}
 	}
@@ -231,69 +237,69 @@ loop:
 func runService(name string, isDebug bool) {
 	var err error
 
-	logger.Info(fmt.Sprintf("Starting %s service", name))
+	globals.Logger.Info(fmt.Sprintf("Starting %s service", name))
 	run := svc.Run
 	if isDebug {
 		run = debug.Run
 	}
 	err = run(name, &exampleService{})
 	if err != nil {
-		logger.Info(fmt.Sprintf("%s service failed: %v", name, err))
+		globals.Logger.Info(fmt.Sprintf("%s service failed: %v", name, err))
 		return
 	}
-	logger.Info(fmt.Sprintf("%s service stopped", name))
+	globals.Logger.Info(fmt.Sprintf("%s service stopped", name))
 }
 
 func runProgram() {
 
 	numCPU := runtime.NumCPU()
 
-	logger.Debug(fmt.Sprintf("Number of cores available = %v", numCPU))
+	globals.Logger.Debug(fmt.Sprintf("Number of cores available = %v", numCPU))
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	//Wait group so the program doesn't exit
-	wg.Add(1)
+	globals.Wg.Add(1)
 
 	// The HTTP Server
-	go startGinServer()
+	go server.StartGinServer()
 
 	// Handler for the different types of messages passed by channels
 	go eventMonitor()
 
 	// Manages the population and update of the repositoiry of flights
-	go InitRepositories()
+	go repo.InitRepositories()
 
 	// Initiate the User Change Subscriptions
-	userChangeSubscriptionsMutex.Lock()
-	for _, up := range getUserProfiles() {
-		userChangeSubscriptions = append(userChangeSubscriptions, up.UserChangeSubscriptions...)
+	globals.UserChangeSubscriptionsMutex.Lock()
+	for _, up := range globals.GetUserProfiles() {
+		globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
 	}
-	userChangeSubscriptionsMutex.Unlock()
-	wg.Wait()
+	globals.UserChangeSubscriptionsMutex.Unlock()
+	globals.Wg.Wait()
 }
 
 func eventMonitor() {
 
 	for {
 		select {
-		case flight := <-flightUpdatedChannel:
+		case flight := <-globals.FlightUpdatedChannel:
 
-			logger.Trace(fmt.Sprintf("FlightUpdated: %s", flight.GetFlightID()))
-			go handleFlightUpdate(flight)
+			globals.Logger.Trace(fmt.Sprintf("FlightUpdated: %s", flight.GetFlightID()))
+			go repo.HandleFlightUpdate(flight)
 
-		case flight := <-flightDeletedChannel:
+		case flight := <-globals.FlightDeletedChannel:
 
-			logger.Trace(fmt.Sprintf("FlightDeleted: %s", flight.GetFlightID()))
-			go handleFlightDelete(flight)
+			globals.Logger.Trace(fmt.Sprintf("FlightDeleted: %s", flight.GetFlightID()))
+			go repo.HandleFlightDelete(flight)
 
-		case flight := <-flightCreatedChannel:
+		case flight := <-globals.FlightCreatedChannel:
 
-			logger.Trace(fmt.Sprintf("FlightCreated: %s", flight.GetFlightID()))
-			go handleFlightCreate(flight)
+			globals.Logger.Trace(fmt.Sprintf("FlightCreated: %s", flight.GetFlightID()))
+			go repo.HandleFlightCreate(flight)
 
-		case numflight := <-flightsInitChannel:
+		case numflight := <-globals.FlightsInitChannel:
 
-			logger.Trace(fmt.Sprintf("Flight Initialised or Refreshed: %v", numflight))
+			globals.Logger.Trace(fmt.Sprintf("Flight Initialised or Refreshed: %v", numflight))
 
 		}
 	}

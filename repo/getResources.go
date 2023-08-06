@@ -1,4 +1,4 @@
-package main
+package repo
 
 import (
 	"errors"
@@ -9,10 +9,14 @@ import (
 	"strings"
 	"time"
 
+	"flightresourcerestapi/globals"
+	"flightresourcerestapi/models"
+	"flightresourcerestapi/timeservice"
+
 	"github.com/gin-gonic/gin"
 )
 
-func getResourceSub(sub UserPushSubscription, userToken string) (ResourceResponse, GetFlightsError) {
+func GetResourceSub(sub models.UserPushSubscription, userToken string) (models.ResourceResponse, models.GetFlightsError) {
 
 	apt := sub.Airport
 	flightID := ""
@@ -27,18 +31,18 @@ func getResourceSub(sub UserPushSubscription, userToken string) (ResourceRespons
 	return getResourcesCommon(apt, flightID, airline, resourceType, resource, strconv.Itoa(from), strconv.Itoa(to), updatedSince, sortBy, userToken, nil)
 }
 
-func getResourceAPI(c *gin.Context) {
+func GetResourceAPI(c *gin.Context) {
 
-	defer exeTime(fmt.Sprintf("Get Resources Request for %s", c.Request.URL))()
+	defer globals.ExeTime(fmt.Sprintf("Get Resources Request for %s", c.Request.URL))()
 	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, "")
+	userProfile := GetUserProfile(c, "")
 
 	if !userProfile.Enabled {
 		c.JSON(http.StatusUnauthorized, gin.H{"Error": fmt.Sprintf("%s", "User Access Has Been Disabled")})
 		return
 	}
 
-	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
+	globals.RequestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 
@@ -82,9 +86,9 @@ func getResourceAPI(c *gin.Context) {
 
 }
 
-func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, sortBy, userToken string, c *gin.Context) (ResourceResponse, GetFlightsError) {
+func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, sortBy, userToken string, c *gin.Context) (models.ResourceResponse, models.GetFlightsError) {
 
-	response := ResourceResponse{}
+	response := models.ResourceResponse{}
 	//	c.Writer.Header().Set("Content-Type", "application/json")
 
 	if resourceType != "" {
@@ -112,7 +116,7 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 	}
 
 	if resourceType != "" && !strings.Contains(strings.ToLower("Checkin Gate Stand Carousel Chute Checkins Gates Stands Carousels Chutes"), strings.ToLower(resourceType)) {
-		return response, GetFlightsError{
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("Invalid resouce type specified."),
 		}
@@ -134,31 +138,31 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 	toTime := time.Now().Add(time.Hour * time.Duration(toOffset))
 	response.ToResource = toTime.Format("2006-01-02T15:04:05")
 
-	updatedSinceTime, updatedSinceErr := time.ParseInLocation("2006-01-02T15:04:05", updatedSince, loc)
+	updatedSinceTime, updatedSinceErr := time.ParseInLocation("2006-01-02T15:04:05", updatedSince, timeservice.Loc)
 	if updatedSinceErr != nil && updatedSince != "" {
-		return response, GetFlightsError{
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("Invalid 'updatedSince' time specified."),
 		}
 	}
 
 	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, userToken)
+	userProfile := GetUserProfile(c, userToken)
 	response.User = userProfile.UserName
 
 	// Set Default airport if none set
 	if apt == "" {
 		//apt = userProfile.DefaultAirport
-		return response, GetFlightsError{
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("Airport not specified"),
 		}
 	}
 
 	//Check that the user is allowed to access the requested airport
-	if !contains(userProfile.AllowedAirlines, apt) &&
-		!contains(userProfile.AllowedAirlines, "*") {
-		return response, GetFlightsError{
+	if !globals.Contains(userProfile.AllowedAirlines, apt) &&
+		!globals.Contains(userProfile.AllowedAirlines, "*") {
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("User is not permitted to access airport"),
 		}
@@ -167,7 +171,7 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 	// Check that the requested airport exists in the repository
 	//_, ok := repoMap[apt]
 	if GetRepo(apt) == nil {
-		return response, GetFlightsError{
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New(fmt.Sprintf("Airport %s not found", apt)),
 		}
@@ -175,13 +179,13 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 
 	response.AirportCode = apt
 
-	var alloc = []AllocationResponseItem{}
+	var alloc = []models.AllocationResponseItem{}
 
-	mapMutex.Lock()
-	defer mapMutex.Unlock()
+	globals.MapMutex.Lock()
+	defer globals.MapMutex.Unlock()
 
 	repo := GetRepo(apt)
-	allocMaps := []ResourceLinkedList{
+	allocMaps := []models.ResourceLinkedList{
 		repo.CheckInList,
 		repo.GateList,
 		repo.StandList,
@@ -260,8 +264,8 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 					}
 				}
 
-				n := AllocationResponseItem{
-					AllocationItem: AllocationItem{From: v.From,
+				n := models.AllocationResponseItem{
+					AllocationItem: models.AllocationItem{From: v.From,
 						To:                   v.To,
 						FlightID:             v.FlightID,
 						Direction:            v.Direction,
@@ -280,7 +284,7 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 		}
 	}
 
-	metricsLogger.Info(fmt.Sprintf("Filter Resources execution time: %s", time.Since(filterStart)))
+	globals.MetricsLogger.Info(fmt.Sprintf("Filter Resources execution time: %s", time.Since(filterStart)))
 
 	sortStart := time.Now()
 	if strings.ToLower(sortBy) == "time" {
@@ -302,35 +306,35 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 		})
 	}
 
-	metricsLogger.Info(fmt.Sprintf("Sort Resources execution time: %s", time.Since(sortStart)))
+	globals.MetricsLogger.Info(fmt.Sprintf("Sort Resources execution time: %s", time.Since(sortStart)))
 
 	response.Allocations = alloc
 
 	// Get the filtered and pruned flights for the request
 	//response, err = filterFlights(request, response, repoMap[apt].Flights, c)
 
-	return response, GetFlightsError{
+	return response, models.GetFlightsError{
 		StatusCode: http.StatusOK,
 		Err:        nil,
 	}
 }
 
-func getConfiguredResources(c *gin.Context) {
+func GetConfiguredResources(c *gin.Context) {
 
-	defer exeTime(fmt.Sprintf("Get Configured Resources Request for %s", c.Request.URL))()
+	defer globals.ExeTime(fmt.Sprintf("Get Configured Resources Request for %s", c.Request.URL))()
 	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, "")
+	userProfile := GetUserProfile(c, "")
 	if !userProfile.Enabled {
 		c.JSON(http.StatusUnauthorized, gin.H{"Error": fmt.Sprintf("%s", "User Access Has Been Disabled")})
 		return
 	}
-	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
+	globals.RequestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 	resourceType := c.Param("resourceType")
 
 	// Create the response object so we can return early if required
-	response := ResourceResponse{}
+	response := models.ResourceResponse{}
 	c.Writer.Header().Set("Content-Type", "application/json")
 
 	if resourceType != "" {
@@ -357,8 +361,8 @@ func getConfiguredResources(c *gin.Context) {
 	}
 
 	//Check that the user is allowed to access the requested airport
-	if !contains(userProfile.AllowedAirlines, apt) &&
-		!contains(userProfile.AllowedAirlines, "*") {
+	if !globals.Contains(userProfile.AllowedAirlines, apt) &&
+		!globals.Contains(userProfile.AllowedAirlines, "*") {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": "User is not permitted to access airport %s"})
 		return
 	}
@@ -372,10 +376,10 @@ func getConfiguredResources(c *gin.Context) {
 
 	response.AirportCode = apt
 
-	var alloc = []ConfiguredResourceResponseItem{}
+	var alloc = []models.ConfiguredResourceResponseItem{}
 
 	repo := GetRepo(apt)
-	allocMaps := []ResourceLinkedList{
+	allocMaps := []models.ResourceLinkedList{
 		repo.CheckInList,
 		repo.GateList,
 		repo.StandList,
@@ -407,7 +411,7 @@ func getConfiguredResources(c *gin.Context) {
 
 		for struc != nil {
 
-			n := ConfiguredResourceResponseItem{
+			n := models.ConfiguredResourceResponseItem{
 				ResourceTypeCode: struc.Resource.ResourceTypeCode,
 				Name:             struc.Resource.Name,
 				Area:             struc.Resource.Area,

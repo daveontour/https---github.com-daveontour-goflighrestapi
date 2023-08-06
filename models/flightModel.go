@@ -1,8 +1,9 @@
-package main
+package models
 
 import (
 	"encoding/json"
 	"encoding/xml"
+	"flightresourcerestapi/timeservice"
 	"fmt"
 	"log"
 	"strings"
@@ -870,7 +871,7 @@ func (f Flight) GetSTO() time.Time {
 	sto := f.FlightState.ScheduledTime
 
 	if sto != "" {
-		stot, err := time.ParseInLocation("2006-01-02T15:04:05", sto, loc)
+		stot, err := time.ParseInLocation("2006-01-02T15:04:05", sto, timeservice.Loc)
 		if err == nil {
 			return stot
 		}
@@ -880,16 +881,16 @@ func (f Flight) GetSTO() time.Time {
 	return time.Now()
 }
 
-func (p CheckInSlot) getResourceID() (name string, from time.Time, to time.Time) {
+func (p CheckInSlot) GetResourceID() (name string, from time.Time, to time.Time) {
 
 	for _, v := range p.Value {
 
 		if v.PropertyName == "StartTime" {
-			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			from, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 		if v.PropertyName == "EndTime" {
-			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			to, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 	}
@@ -903,16 +904,16 @@ func (p CheckInSlot) getResourceID() (name string, from time.Time, to time.Time)
 	return
 }
 
-func (p StandSlot) getResourceID() (name string, from time.Time, to time.Time) {
+func (p StandSlot) GetResourceID() (name string, from time.Time, to time.Time) {
 
 	for _, v := range p.Value {
 
 		if v.PropertyName == "StartTime" {
-			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			from, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 		if v.PropertyName == "EndTime" {
-			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			to, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 	}
@@ -925,16 +926,16 @@ func (p StandSlot) getResourceID() (name string, from time.Time, to time.Time) {
 	}
 	return
 }
-func (p CarouselSlot) getResourceID() (name string, from time.Time, to time.Time) {
+func (p CarouselSlot) GetResourceID() (name string, from time.Time, to time.Time) {
 
 	for _, v := range p.Value {
 
 		if v.PropertyName == "StartTime" {
-			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			from, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 		if v.PropertyName == "EndTime" {
-			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			to, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 	}
@@ -948,16 +949,16 @@ func (p CarouselSlot) getResourceID() (name string, from time.Time, to time.Time
 	return
 }
 
-func (p ChuteSlot) getResourceID() (name string, from time.Time, to time.Time) {
+func (p ChuteSlot) GetResourceID() (name string, from time.Time, to time.Time) {
 
 	for _, v := range p.Value {
 
 		if v.PropertyName == "StartTime" {
-			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			from, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 		if v.PropertyName == "EndTime" {
-			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			to, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 	}
@@ -971,16 +972,16 @@ func (p ChuteSlot) getResourceID() (name string, from time.Time, to time.Time) {
 	return
 }
 
-func (p GateSlot) getResourceID() (name string, from time.Time, to time.Time) {
+func (p GateSlot) GetResourceID() (name string, from time.Time, to time.Time) {
 
 	for _, v := range p.Value {
 
 		if v.PropertyName == "StartTime" {
-			from, _ = time.ParseInLocation(layout, v.Text, loc)
+			from, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 		if v.PropertyName == "EndTime" {
-			to, _ = time.ParseInLocation(layout, v.Text, loc)
+			to, _ = time.ParseInLocation(timeservice.Layout, v.Text, timeservice.Loc)
 			continue
 		}
 	}

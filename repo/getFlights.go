@@ -1,4 +1,4 @@
-package main
+package repo
 
 import (
 	"errors"
@@ -9,21 +9,53 @@ import (
 	"strings"
 	"time"
 
+	"flightresourcerestapi/globals"
+	"flightresourcerestapi/models"
+	"flightresourcerestapi/timeservice"
+
 	"github.com/gin-gonic/gin"
 )
 
-func getRequestedFlightsAPI(c *gin.Context) {
+func GetUserProfile(c *gin.Context, userToken string) models.UserProfile {
 
-	defer exeTime(fmt.Sprintf("Get Flight Processing time for %s", c.Request.RequestURI))()
+	defer globals.ExeTime("Getting User Profile")()
+
+	key := userToken
+
+	if c != nil {
+		keys := c.Request.Header["Token"]
+		key = "default"
+
+		if keys != nil {
+			key = keys[0]
+		}
+
+	}
+	users := globals.GetUserProfiles()
+	userProfile := models.UserProfile{}
+
+	for _, u := range users {
+		if key == u.Key {
+			userProfile = u
+			break
+		}
+	}
+
+	return userProfile
+
+}
+func GetRequestedFlightsAPI(c *gin.Context) {
+
+	defer globals.ExeTime(fmt.Sprintf("Get Flight Processing time for %s", c.Request.RequestURI))()
 	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, "")
+	userProfile := GetUserProfile(c, "")
 
 	if !userProfile.Enabled {
 		c.JSON(http.StatusUnauthorized, gin.H{"Error": fmt.Sprintf("%s", "User Access Has Been Disabled")})
 		return
 	}
 
-	requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
+	globals.RequestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", userProfile.UserName, c.RemoteIP(), c.Request.RequestURI))
 
 	apt := c.Param("apt")
 	direction := strings.ToUpper(c.Query("direction"))
@@ -42,7 +74,7 @@ func getRequestedFlightsAPI(c *gin.Context) {
 		route = c.Query("r")
 	}
 
-	response, error := getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, "", c, nil)
+	response, error := GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, "", c, nil)
 	c.Writer.Header().Set("Content-Type", "application/json")
 
 	if error.Err == nil {
@@ -53,7 +85,7 @@ func getRequestedFlightsAPI(c *gin.Context) {
 
 }
 
-func getRequestedFlightsSub(sub UserPushSubscription, userToken string) (Response, GetFlightsError) {
+func GetRequestedFlightsSub(sub models.UserPushSubscription, userToken string) (models.Response, models.GetFlightsError) {
 	apt := sub.Airport
 	direction := strings.ToUpper(sub.Direction)
 	airline := sub.Airline
@@ -62,13 +94,13 @@ func getRequestedFlightsSub(sub UserPushSubscription, userToken string) (Respons
 	route := strings.ToUpper(sub.Route)
 	qf := sub.QueryableCustomFields
 
-	return getRequestedFlightsCommon(apt, direction, airline, "", strconv.Itoa(from), strconv.Itoa(to), route, userToken, nil, qf)
+	return GetRequestedFlightsCommon(apt, direction, airline, "", strconv.Itoa(from), strconv.Itoa(to), route, userToken, nil, qf)
 
 }
-func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, userToken string, c *gin.Context, qf []ParameterValuePair) (Response, GetFlightsError) {
+func GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, userToken string, c *gin.Context, qf []models.ParameterValuePair) (models.Response, models.GetFlightsError) {
 
 	// Create the response object so we can return early if required
-	response := Response{}
+	response := models.Response{}
 
 	// Add the flights the response object and return nil for errors
 	if direction != "" {
@@ -85,13 +117,13 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	response.Route = route
 
 	// Get the profile of the user making the request
-	userProfile := getUserProfile(c, userToken)
+	userProfile := GetUserProfile(c, userToken)
 	response.User = userProfile.UserName
 
 	if apt == "" {
 		//apt = userProfile.DefaultAirport
 
-		return response, GetFlightsError{
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("Airport not specified"),
 		}
@@ -99,7 +131,7 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 
 	// Check that the requested airport exists in the repository
 	if GetRepo(apt) == nil {
-		return response, GetFlightsError{
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New(fmt.Sprintf("Airport %s not found", apt)),
 		}
@@ -112,9 +144,9 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	}
 
 	//Check that the user is allowed to access the requested airline
-	if !contains(userProfile.AllowedAirports, apt) &&
-		!contains(userProfile.AllowedAirports, "*") {
-		return response, GetFlightsError{
+	if !globals.Contains(userProfile.AllowedAirports, apt) &&
+		!globals.Contains(userProfile.AllowedAirports, "*") {
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("User is not allowed to access requested airport"),
 		}
@@ -123,16 +155,16 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	response.AirportCode = apt
 
 	// Build the request object
-	request := Request{Direction: direction, Airline: airline, FltNum: flt, From: from, To: to, UserProfile: userProfile, Route: route}
+	request := models.Request{Direction: direction, Airline: airline, FltNum: flt, From: from, To: to, UserProfile: userProfile, Route: route}
 
 	// Reform the request based on the user Profile and the request parameters
 	request, response = processCustomFieldQueries(request, response, c, qf)
 
 	// If the user is requesting a particular airline, check that they are allowed to access that airline
 	if airline != "" && userProfile.AllowedAirlines != nil {
-		if !contains(userProfile.AllowedAirlines, airline) &&
-			!contains(userProfile.AllowedAirlines, "*") {
-			return response, GetFlightsError{
+		if !globals.Contains(userProfile.AllowedAirlines, airline) &&
+			!globals.Contains(userProfile.AllowedAirlines, "*") {
+			return response, models.GetFlightsError{
 				StatusCode: http.StatusBadRequest,
 				Err:        errors.New("unavailable"),
 			}
@@ -142,25 +174,25 @@ func getRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	var err error
 
 	// Get the filtered and pruned flights for the request
-	mapMutex.Lock()
+	globals.MapMutex.Lock()
 	flights := GetRepo(apt).FlightLinkedList
 	response, err = filterFlights(request, response, flights, c)
-	mapMutex.Unlock()
+	globals.MapMutex.Unlock()
 
 	if err == nil {
-		return response, GetFlightsError{
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusOK,
 			Err:        nil,
 		}
 	} else {
-		return response, GetFlightsError{
+		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        err,
 		}
 	}
 }
 
-func processCustomFieldQueries(request Request, response Response, c *gin.Context, qf []ParameterValuePair) (Request, Response) {
+func processCustomFieldQueries(request models.Request, response models.Response, c *gin.Context, qf []models.ParameterValuePair) (models.Request, models.Response) {
 
 	customFieldQureyMap := make(map[string]string)
 
@@ -168,7 +200,7 @@ func processCustomFieldQueries(request Request, response Response, c *gin.Contex
 		// Find the potential customField queries in the request
 		queryMap := c.Request.URL.Query()
 		for k, v := range queryMap {
-			if !contains(reservedParameters, k) {
+			if !globals.Contains(globals.ReservedParameters, k) {
 				customFieldQureyMap[k] = v[0]
 			}
 		}
@@ -196,7 +228,7 @@ func processCustomFieldQueries(request Request, response Response, c *gin.Contex
 	// Remove any queries against unauthorised fields
 	remove := []string{}
 	for k, _ := range customFieldQureyMap {
-		if !contains(request.UserProfile.AllowedCustomFields, k) && !contains(request.UserProfile.AllowedCustomFields, "*") {
+		if !globals.Contains(request.UserProfile.AllowedCustomFields, k) && !globals.Contains(request.UserProfile.AllowedCustomFields, "*") {
 			remove = append(remove, k)
 		}
 	}
@@ -206,20 +238,20 @@ func processCustomFieldQueries(request Request, response Response, c *gin.Contex
 		response.AddWarning(fmt.Sprintf("Ignoring unauthorised query against custom field: %s", k))
 	}
 
-	presentQueryableParameters := []ParameterValuePair{}
+	presentQueryableParameters := []models.ParameterValuePair{}
 
 	for k, v := range customFieldQureyMap {
-		presentQueryableParameters = append(presentQueryableParameters, ParameterValuePair{Parameter: k, Value: v})
+		presentQueryableParameters = append(presentQueryableParameters, models.ParameterValuePair{Parameter: k, Value: v})
 	}
 
 	request.PresentQueryableParameters = presentQueryableParameters
 
 	return request, response
 }
-func filterFlights(request Request, response Response, flightsLinkedList FlightLinkedList, c *gin.Context) (Response, error) {
+func filterFlights(request models.Request, response models.Response, flightsLinkedList models.FlightLinkedList, c *gin.Context) (models.Response, error) {
 
 	//defer exeTime("Filter, Prune and Sort Flights")()
-	returnFlights := []Flight{}
+	returnFlights := []models.Flight{}
 
 	// var from time.Time
 	// var to time.Time
@@ -242,9 +274,9 @@ func filterFlights(request Request, response Response, flightsLinkedList FlightL
 	response.To = to.Format("2006-01-02T15:04:05")
 
 	if request.UpdatedSince != "" {
-		t, err := time.ParseInLocation("2006-01-02T15:04:05", request.UpdatedSince, loc)
+		t, err := time.ParseInLocation("2006-01-02T15:04:05", request.UpdatedSince, timeservice.Loc)
 		if err != nil {
-			return Response{}, err
+			return models.Response{}, err
 		} else {
 			updatedSinceTime = t
 			response.To = t.String()
@@ -253,7 +285,7 @@ func filterFlights(request Request, response Response, flightsLinkedList FlightL
 
 	allowedAllAirline := false
 	if request.UserProfile.AllowedAirlines != nil {
-		if contains(request.UserProfile.AllowedAirlines, "*") {
+		if globals.Contains(request.UserProfile.AllowedAirlines, "*") {
 			allowedAllAirline = true
 		}
 	}
@@ -323,7 +355,7 @@ NextFlight:
 		// "*" entry in AllowedAirlines allows all.
 		if !allowedAllAirline {
 			if request.UserProfile.AllowedAirlines != nil {
-				if !contains(request.UserProfile.AllowedAirlines, currentFlight.GetIATAAirline()) {
+				if !globals.Contains(request.UserProfile.AllowedAirlines, currentFlight.GetIATAAirline()) {
 					currentFlight = currentFlight.NextNode
 					continue
 				}
@@ -332,18 +364,18 @@ NextFlight:
 
 		// Made it here without being filtered out, so add it to the flights to be returned. The "prune"
 		// function removed any message elements that the user is not allowed to see
-		currentFlight.Action = StatusAction
+		currentFlight.Action = globals.StatusAction
 		returnFlights = append(returnFlights, *currentFlight)
 		currentFlight = currentFlight.NextNode
 	}
 
-	metricsLogger.Info(fmt.Sprintf("Filter Flights execution time: %s", time.Since(filterStart)))
+	globals.MetricsLogger.Info(fmt.Sprintf("Filter Flights execution time: %s", time.Since(filterStart)))
 
 	returnFlights = prune(returnFlights, request)
 
 	response.NumberOfFlights = len(returnFlights)
 
-	defer exeTime(fmt.Sprintf("Sorting %v Filtered Flights", response.NumberOfFlights))()
+	defer globals.ExeTime(fmt.Sprintf("Sorting %v Filtered Flights", response.NumberOfFlights))()
 	sort.Slice(returnFlights, func(i, j int) bool {
 		return returnFlights[i].GetSTO().Before(returnFlights[j].GetSTO())
 	})
@@ -355,9 +387,9 @@ NextFlight:
 }
 
 // Creates a copy of the flight record with the custom fields that the user is allowed to see
-func prune(flights []Flight, request Request) (flDups []Flight) {
+func prune(flights []models.Flight, request models.Request) (flDups []models.Flight) {
 
-	defer exeTime(fmt.Sprintf("Pruning %v Filtered Flights", len(flights)))()
+	defer globals.ExeTime(fmt.Sprintf("Pruning %v Filtered Flights", len(flights)))()
 
 	for _, flight := range flights {
 
@@ -365,30 +397,30 @@ func prune(flights []Flight, request Request) (flDups []Flight) {
 		flDup := flight
 
 		// Clear all the Custom Field Parameters
-		flDup.FlightState.Value = []Value{}
+		flDup.FlightState.Value = []models.Value{}
 
 		// If Allowed CustomFields is not nil, then filter the custome fields
 		// if "*" in list then it is all custom fields
 		// Extra safety, if the parameter is not defined, then no results returned
 
 		if request.UserProfile.AllowedCustomFields != nil {
-			if contains(request.UserProfile.AllowedCustomFields, "*") {
+			if globals.Contains(request.UserProfile.AllowedCustomFields, "*") {
 				flDup.FlightState.Value = flight.FlightState.Value
 			} else {
 				for _, property := range request.UserProfile.AllowedCustomFields {
 					data := flight.GetProperty(property)
 
 					if data != "" {
-						flDup.FlightState.Value = append(flDup.FlightState.Value, Value{property, data})
+						flDup.FlightState.Value = append(flDup.FlightState.Value, models.Value{property, data})
 					}
 				}
 			}
 		}
 
-		changes := []Change{}
+		changes := []models.Change{}
 
 		for ii := 0; ii < len(flDup.FlightChanges.Changes); ii++ {
-			ok := contains(request.UserProfile.AllowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
+			ok := globals.Contains(request.UserProfile.AllowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
 			ok = ok || request.UserProfile.AllowedCustomFields == nil
 			if ok {
 				changes = append(changes, flDup.FlightChanges.Changes[ii])

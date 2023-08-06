@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"crypto/rand"
@@ -7,6 +7,9 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"flightresourcerestapi/globals"
+	"flightresourcerestapi/models"
+	"flightresourcerestapi/repo"
 	"fmt"
 	"io"
 
@@ -20,10 +23,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func startGinServer() {
+func StartGinServer() {
 
 	mode := gin.ReleaseMode
-	if configViper.GetBool("DebugService") {
+	if globals.ConfigViper.GetBool("DebugService") {
 		mode = gin.DebugMode
 	}
 	gin.SetMode(mode)
@@ -33,13 +36,13 @@ func startGinServer() {
 	// Configure all the endpoints for the HTTP Server
 
 	// Test purposes only to just printout whatever was received by the server
-	if configViper.GetBool("TestHTTPServer") {
+	if globals.ConfigViper.GetBool("TestHTTPServer") {
 		router.POST("/test", testQuery)
 	}
-	router.GET("/getFlights/:apt", getRequestedFlightsAPI)
-	router.GET("/getResources/:apt", getResourceAPI)
-	router.GET("/getConfiguredResources/:apt/:resourceType", getConfiguredResources)
-	router.GET("/getConfiguredResources/:apt", getConfiguredResources)
+	router.GET("/getFlights/:apt", repo.GetRequestedFlightsAPI)
+	router.GET("/getResources/:apt", repo.GetResourceAPI)
+	router.GET("/getConfiguredResources/:apt/:resourceType", repo.GetConfiguredResources)
+	router.GET("/getConfiguredResources/:apt", repo.GetConfiguredResources)
 
 	router.GET("/admin/reinit/:apt", reinit)
 	router.GET("/admin/stopJobs/:apt/:userToken", stopJobs)
@@ -48,8 +51,8 @@ func startGinServer() {
 	router.GET("/admin/repoMetricsReport/:apt", metricsReport)
 	router.GET("/admin/enableMetrics", func(c *gin.Context) {
 		if hasAdminToken(c) {
-			metricsLogger.SetLevel(logrus.InfoLevel)
-			metricsLogger.Info("Performance Metrics Reporting Enabled")
+			globals.MetricsLogger.SetLevel(logrus.InfoLevel)
+			globals.MetricsLogger.Info("Performance Metrics Reporting Enabled")
 			c.JSON(http.StatusOK, gin.H{"PerformanceMetricsReporting": fmt.Sprintf("Enabled")})
 		} else {
 			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
@@ -57,11 +60,11 @@ func startGinServer() {
 	})
 	router.GET("/admin/disableMetrics", func(c *gin.Context) {
 		if hasAdminToken(c) {
-			metricsLogger.Info("Performance Metrics Reporting Disabled")
-			metricsLogger.SetLevel(logrus.ErrorLevel)
+			globals.MetricsLogger.Info("Performance Metrics Reporting Disabled")
+			globals.MetricsLogger.SetLevel(logrus.ErrorLevel)
 			c.JSON(http.StatusOK, gin.H{"PerformanceMetricsReporting": fmt.Sprintf("Disabledd")})
 		} else {
-			metricsLogger.Info("Performance Metrics Enabled")
+			globals.MetricsLogger.Info("Performance Metrics Enabled")
 		}
 	})
 	router.GET("/help", func(c *gin.Context) {
@@ -92,32 +95,32 @@ func startGinServer() {
 	// })
 
 	// Start it up with the configured security mode
-	if !configViper.GetBool("UseHTTPS") && !configViper.GetBool("UseHTTPSUntrusted") {
+	if !globals.ConfigViper.GetBool("UseHTTPS") && !globals.ConfigViper.GetBool("UseHTTPSUntrusted") {
 
-		err := router.Run(configViper.GetString("ServiceIPPort"))
+		err := router.Run(globals.ConfigViper.GetString("ServiceIPPort"))
 		if err != nil {
-			logger.Fatal("Unable to start HTTP server.")
-			wg.Done()
+			globals.Logger.Fatal("Unable to start HTTP server.")
+			globals.Wg.Done()
 			os.Exit(2)
 		}
 
-	} else if configViper.GetBool("UseHTTPS") && configViper.GetString("KeyFile") != "" && configViper.GetString("CertFile") != "" {
+	} else if globals.ConfigViper.GetBool("UseHTTPS") && globals.ConfigViper.GetString("KeyFile") != "" && globals.ConfigViper.GetString("CertFile") != "" {
 
-		server := http.Server{Addr: configViper.GetString("ServiceIPPort"), Handler: router}
-		err := server.ListenAndServeTLS(configViper.GetString("CertFile"), configViper.GetString("KeyFile"))
+		server := http.Server{Addr: globals.ConfigViper.GetString("ServiceIPPort"), Handler: router}
+		err := server.ListenAndServeTLS(globals.ConfigViper.GetString("CertFile"), globals.ConfigViper.GetString("KeyFile"))
 		if err != nil {
-			logger.Fatal("Unable to start HTTPS server. Likely cause is that the keyFile or certFile were not found")
-			wg.Done()
+			globals.Logger.Fatal("Unable to start HTTPS server. Likely cause is that the keyFile or certFile were not found")
+			globals.Wg.Done()
 			os.Exit(2)
 		}
 
-	} else if configViper.GetBool("UseHTTPS") && (configViper.GetString("KeyFile") == "" && configViper.GetString("CertFile") == "") {
+	} else if globals.ConfigViper.GetBool("UseHTTPS") && (globals.ConfigViper.GetString("KeyFile") == "" && globals.ConfigViper.GetString("CertFile") == "") {
 
-		logger.Fatal("Unable to start HTTPS server. Trusted HTTPS was configured but The keyFile or certFile were not configured")
-		wg.Done()
+		globals.Logger.Fatal("Unable to start HTTPS server. Trusted HTTPS was configured but The keyFile or certFile were not configured")
+		globals.Wg.Done()
 		os.Exit(2)
 
-	} else if configViper.GetBool("UseHTTPSUntruste") {
+	} else if globals.ConfigViper.GetBool("UseHTTPSUntruste") {
 
 		cert := &x509.Certificate{
 			SerialNumber: big.NewInt(1658),
@@ -148,12 +151,12 @@ func startGinServer() {
 		x509Cert, _ := tls.X509KeyPair(certBytes, keyBytes)
 
 		tlsConfig := &tls.Config{Certificates: []tls.Certificate{x509Cert}}
-		server := http.Server{Addr: configViper.GetString("ServiceIPPort"), Handler: router, TLSConfig: tlsConfig}
+		server := http.Server{Addr: globals.ConfigViper.GetString("ServiceIPPort"), Handler: router, TLSConfig: tlsConfig}
 
 		err := server.ListenAndServeTLS("", "")
 		if err != nil {
-			logger.Fatal("Unable to start HTTPS server with local certificates and key")
-			wg.Done()
+			globals.Logger.Fatal("Unable to start HTTPS server with local certificates and key")
+			globals.Wg.Done()
 			os.Exit(2)
 		}
 	}
@@ -165,7 +168,7 @@ func hasAdminToken(c *gin.Context) bool {
 	if keys == nil {
 		return false
 	}
-	if keys[0] == configViper.GetString("AdminToken") {
+	if keys[0] == globals.ConfigViper.GetString("AdminToken") {
 		return true
 	} else {
 		return false
@@ -178,11 +181,11 @@ func reinit(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
 		return
 	} else {
-		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+		globals.RequestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
 	}
 
 	apt := c.Param("apt")
-	reInitAirport(apt)
+	repo.ReInitAirport(apt)
 }
 
 func metricsReport(c *gin.Context) {
@@ -192,15 +195,15 @@ func metricsReport(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
 		return
 	} else {
-		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+		globals.RequestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
 	}
 
 	apt := c.Param("apt")
 
-	metrics := MetricsReport{}
+	metrics := models.MetricsReport{}
 	metrics.Airport = apt
 
-	repo := GetRepo(apt)
+	repo := repo.GetRepo(apt)
 
 	metrics.NumberOfFlights = (*repo).FlightLinkedList.Len()
 	metrics.NumberOfCheckins = (*repo).CheckInList.Len()
@@ -236,14 +239,14 @@ func stopJobs(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
 		return
 	} else {
-		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+		globals.RequestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
 	}
 
 	apt := c.Param("apt")
 	userToken := c.Param("userToken")
-	s := schedulerMap[apt]
+	s := globals.SchedulerMap[apt]
 	s.RemoveByTag(userToken)
-	logger.Info(fmt.Sprintf("All Aiport Jobs Stopped for %s, user %s", apt, userToken))
+	globals.Logger.Info(fmt.Sprintf("All Aiport Jobs Stopped for %s, user %s", apt, userToken))
 }
 
 func stopAllAptJobs(c *gin.Context) {
@@ -252,75 +255,66 @@ func stopAllAptJobs(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
 		return
 	} else {
-		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+		globals.RequestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
 	}
 
 	apt := c.Param("apt")
 
 	// Get the schedule for the particular airport and clear it
-	s := schedulerMap[apt]
+	s := globals.SchedulerMap[apt]
 	s.Clear()
-	logger.Info(fmt.Sprintf("All Aiport Jobs Stopped for %s", apt))
+	globals.Logger.Info(fmt.Sprintf("All Aiport Jobs Stopped for %s", apt))
 }
 func rescheduleAllAptJobs(c *gin.Context) {
-	if !hasAdminToken(c) {
-		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
-		return
-	} else {
-		requestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
-	}
-	apt := c.Param("apt")
+	// if !hasAdminToken(c) {
+	// 	c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+	// 	return
+	// } else {
+	// 	globals.RequestLogger.Info(fmt.Sprintf("User: %s IP: %s Request:%s", "admin", c.RemoteIP(), c.Request.RequestURI))
+	// }
+	// apt := c.Param("apt")
 
-	// Reload the schdule of jobs for the airport
-	reloadschedulePushes(apt)
-	logger.Info(fmt.Sprintf("Rescheduled All Aiport Jobs Stopped for %s", apt))
+	// // Reload the schdule of jobs for the airport
+	// push.ReloadschedulePushes(apt)
+	// globals.Logger.Info(fmt.Sprintf("Rescheduled All Aiport Jobs Stopped for %s", apt))
 }
 
-func getUserProfile(c *gin.Context, userToken string) UserProfile {
+// func getUserProfile(c *gin.Context, userToken string) models.UserProfile {
 
-	defer exeTime("Getting User Profile")()
+// 	defer globals.ExeTime("Getting User Profile")()
 
-	key := userToken
+// 	key := userToken
 
-	if c != nil {
-		keys := c.Request.Header["Token"]
-		key = "default"
+// 	if c != nil {
+// 		keys := c.Request.Header["Token"]
+// 		key = "default"
 
-		if keys != nil {
-			key = keys[0]
-		}
+// 		if keys != nil {
+// 			key = keys[0]
+// 		}
 
-	}
-	users := getUserProfiles()
-	userProfile := UserProfile{}
+// 	}
+// 	users := globals.GetUserProfiles()
+// 	userProfile := models.UserProfile{}
 
-	for _, u := range users {
-		if key == u.Key {
-			userProfile = u
-			break
-		}
-	}
+// 	for _, u := range users {
+// 		if key == u.Key {
+// 			userProfile = u
+// 			break
+// 		}
+// 	}
 
-	return userProfile
+// 	return userProfile
 
-}
+// }
 
 // Function to just write what was recieved by the server
 func testQuery(c *gin.Context) {
-	if logger.Level == logrus.TraceLevel {
-		logger.Info("Received message on test HTTP Server")
+	if globals.Logger.Level == logrus.TraceLevel {
+		globals.Logger.Info("Received message on test HTTP Server")
 		jsonData, _ := io.ReadAll(c.Request.Body)
 		fmt.Println(string(jsonData[:]))
 	} else {
-		logger.Info("Received message on test HTTP Server")
+		globals.Logger.Info("Received message on test HTTP Server")
 	}
-}
-
-type GetFlightsError struct {
-	StatusCode int
-	Err        error
-}
-
-func (r *GetFlightsError) Error() string {
-	return fmt.Sprintf("status %d: err %v", r.StatusCode, r.Err)
 }

@@ -1,4 +1,4 @@
-package main
+package repo
 
 import (
 	"bytes"
@@ -10,26 +10,30 @@ import (
 	"time"
 
 	"github.com/go-co-op/gocron"
+
+	"flightresourcerestapi/globals"
+	"flightresourcerestapi/models"
+	"flightresourcerestapi/timeservice"
 )
 
-func reloadschedulePushes(airportCode string) {
-	if _, ok := schedulerMap[airportCode]; ok {
-		schedulerMap[airportCode].Clear()
-		delete(schedulerMap, airportCode)
+func ReloadschedulePushes(airportCode string) {
+	if _, ok := globals.SchedulerMap[airportCode]; ok {
+		globals.SchedulerMap[airportCode].Clear()
+		delete(globals.SchedulerMap, airportCode)
 	}
-	go schedulePushes(airportCode)
+	go SchedulePushes(airportCode)
 }
 
 var schedPushLock sync.Mutex
 
-func schedulePushes(airportCode string) {
+func SchedulePushes(airportCode string) {
 
 	today := time.Now().Format("2006-01-02")
 	s := gocron.NewScheduler(time.Local)
 
-	schedulerMap[airportCode] = s
+	globals.SchedulerMap[airportCode] = s
 
-	for _, u := range getUserProfiles() {
+	for _, u := range globals.GetUserProfiles() {
 
 		for _, sub := range u.UserPushSubscriptions {
 			if sub.Airport != airportCode || !sub.Enabled {
@@ -37,13 +41,13 @@ func schedulePushes(airportCode string) {
 			}
 
 			startTimeStr := today + "T" + sub.Time
-			startTime, _ := time.ParseInLocation("2006-01-02T15:04:05", startTimeStr, loc)
+			startTime, _ := time.ParseInLocation("2006-01-02T15:04:05", startTimeStr, timeservice.Loc)
 
 			if sub.ReptitionHours != 0 {
 				user := u.UserName
 				token := u.Key
 				s.Every(sub.ReptitionHours).Hours().StartAt(startTime).Tag(token).Do(func() { executeScheduledPush(sub, token, user) })
-				logger.Info(fmt.Sprintf("Scheduled Push for user %s, starting from %s, repeating every %v hours", u.UserName, startTimeStr, sub.ReptitionHours))
+				globals.Logger.Info(fmt.Sprintf("Scheduled Push for user %s, starting from %s, repeating every %v hours", u.UserName, startTimeStr, sub.ReptitionHours))
 				if sub.PushOnStartUp {
 					go executeScheduledPush(sub, token, user)
 				}
@@ -53,7 +57,7 @@ func schedulePushes(airportCode string) {
 				user := u.UserName
 				token := u.Key
 				s.Every(sub.ReptitionMinutes).Minutes().StartAt(time.Now()).Tag(token).Do(func() { executeScheduledPush(sub, token, user) })
-				logger.Info(fmt.Sprintf("Scheduled Push for user %s, starting from now, repeating every %v minutes", u.UserName, sub.ReptitionMinutes))
+				globals.Logger.Info(fmt.Sprintf("Scheduled Push for user %s, starting from now, repeating every %v minutes", u.UserName, sub.ReptitionMinutes))
 				if sub.PushOnStartUp {
 					go executeScheduledPush(sub, token, user)
 				}
@@ -64,23 +68,23 @@ func schedulePushes(airportCode string) {
 	s.StartBlocking()
 }
 
-func handleFlightUpdate(flt Flight) {
+func HandleFlightUpdate(flt models.Flight) {
 	checkForImpactedSubscription(flt)
 	return
 }
 
-func handleFlightCreate(flt Flight) {
+func HandleFlightCreate(flt models.Flight) {
 	checkForImpactedSubscription(flt)
 	return
 }
 
-func handleFlightDelete(flt Flight) {
+func HandleFlightDelete(flt models.Flight) {
 	checkForImpactedSubscription(flt)
 	return
 }
 
 // Check if any of the registered change subscriptions are interested in this change
-func checkForImpactedSubscription(flt Flight) {
+func checkForImpactedSubscription(flt models.Flight) {
 
 	sto := flt.GetSTO()
 
@@ -88,11 +92,11 @@ func checkForImpactedSubscription(flt Flight) {
 		return
 	}
 
-	userChangeSubscriptionsMutex.Lock()
-	defer userChangeSubscriptionsMutex.Unlock()
+	globals.UserChangeSubscriptionsMutex.Lock()
+	defer globals.UserChangeSubscriptionsMutex.Unlock()
 
 NextSub:
-	for _, sub := range userChangeSubscriptions {
+	for _, sub := range globals.UserChangeSubscriptions {
 
 		if !sub.Enabled {
 			continue
@@ -101,32 +105,32 @@ NextSub:
 			continue
 		}
 
-		if !sub.UpdateFlight && flt.Action == UpdateAction {
+		if !sub.UpdateFlight && flt.Action == globals.UpdateAction {
 			continue
 		}
-		if sub.CreateFlight && flt.Action == CreateAction {
+		if sub.CreateFlight && flt.Action == globals.CreateAction {
 			go executeChangePush(sub, flt)
 			continue NextSub
 		}
-		if !sub.DeleteFlight && flt.Action == DeleteAction {
+		if !sub.DeleteFlight && flt.Action == globals.DeleteAction {
 			continue
 		}
 
-		if sub.DeleteFlight && flt.Action == DeleteAction {
+		if sub.DeleteFlight && flt.Action == globals.DeleteAction {
 			go executeChangePush(sub, flt)
 			continue NextSub
 		}
-		if sub.CreateFlight && flt.Action == CreateAction {
+		if sub.CreateFlight && flt.Action == globals.CreateAction {
 			go executeChangePush(sub, flt)
 			continue NextSub
 		}
-		if !sub.UpdateFlight && flt.Action == UpdateAction {
+		if !sub.UpdateFlight && flt.Action == globals.UpdateAction {
 			continue
 		}
 		// Required Parameter Field Changes
 		for _, change := range flt.FlightChanges.Changes {
 
-			if contains(sub.ParameterChange, change.PropertyName) {
+			if globals.Contains(sub.ParameterChange, change.PropertyName) {
 				go executeChangePush(sub, flt)
 				continue NextSub
 			}
@@ -178,16 +182,16 @@ NextSub:
 }
 
 // Function that sends the flight to the defined endpoint
-func executeChangePush(sub UserChangeSubscription, flight Flight) {
+func executeChangePush(sub models.UserChangeSubscription, flight models.Flight) {
 
-	logger.Debug(fmt.Sprintf("Executing Change Push for User "))
+	globals.Logger.Debug(fmt.Sprintf("Executing Change Push for User "))
 
 	queryBody, _ := json.Marshal(flight)
 	bodyReader := bytes.NewReader([]byte(queryBody))
 
 	req, err := http.NewRequest(http.MethodPost, sub.DestinationURL, bodyReader)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Change Push Client: could not create change request: %s\n", err))
+		globals.Logger.Error(fmt.Sprintf("Change Push Client: could not create change request: %s\n", err))
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -200,33 +204,33 @@ func executeChangePush(sub UserChangeSubscription, flight Flight) {
 	}
 	r, sendErr := client.Do(req)
 	if sendErr != nil {
-		logger.Error(fmt.Sprintf("Change Push Client. Error making http request: %s", sendErr))
+		globals.Logger.Error(fmt.Sprintf("Change Push Client. Error making http request: %s", sendErr))
 	}
 	if r.StatusCode != 200 {
-		logger.Error(fmt.Sprintf("Change Push Client. Error making HTTP request: Returned status code = %v. URL = %s", r.StatusCode, sub.DestinationURL))
+		globals.Logger.Error(fmt.Sprintf("Change Push Client. Error making HTTP request: Returned status code = %v. URL = %s", r.StatusCode, sub.DestinationURL))
 	}
 }
 
-func executeScheduledPush(sub UserPushSubscription, userToken, userName string) {
+func executeScheduledPush(sub models.UserPushSubscription, userToken, userName string) {
 
 	// schedPushLock.Lock()
 	// defer schedPushLock.Unlock()
 
-	logger.Info(fmt.Sprintf("Executing Scheduled Push for User %s", userName))
+	globals.Logger.Info(fmt.Sprintf("Executing Scheduled Push for User %s", userName))
 
 	var response interface{}
-	var error GetFlightsError
+	var error models.GetFlightsError
 
 	// filterMutex.Lock()
 	// defer filterMutex.Unlock()
 	if strings.ToLower(sub.SubscriptionType) == "flight" {
-		response, error = getRequestedFlightsSub(sub, userToken)
+		response, error = GetRequestedFlightsSub(sub, userToken)
 	} else if strings.ToLower(sub.SubscriptionType) == "resource" {
-		response, error = getResourceSub(sub, userToken)
+		response, error = GetResourceSub(sub, userToken)
 	}
 
 	if error.Err != nil {
-		logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error with scheduled push %s", userName, error.Error()))
+		globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error with scheduled push %s", userName, error.Error()))
 		return
 	}
 
@@ -235,7 +239,7 @@ func executeScheduledPush(sub UserPushSubscription, userToken, userName string) 
 
 	req, err := http.NewRequest(http.MethodPost, sub.DestinationURL, bodyReader)
 	if err != nil {
-		logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: could not create request: %s\n", userName, err))
+		globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: could not create request: %s\n", userName, err))
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -245,10 +249,10 @@ func executeScheduledPush(sub UserPushSubscription, userToken, userName string) 
 
 	r, sendErr := http.DefaultClient.Do(req)
 	if sendErr != nil {
-		logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error making http request: %s\n", userName, sendErr))
+		globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error making http request: %s\n", userName, sendErr))
 	}
 	if r.StatusCode != 200 {
-		logger.Error(fmt.Sprintf("Scheduled Push Client. Error making HTTP request: Returned status code = %v. URL = %s", r.StatusCode, sub.DestinationURL))
+		globals.Logger.Error(fmt.Sprintf("Scheduled Push Client. Error making HTTP request: Returned status code = %v. URL = %s", r.StatusCode, sub.DestinationURL))
 	}
 
 	return

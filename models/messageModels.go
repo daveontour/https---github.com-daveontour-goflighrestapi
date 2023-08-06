@@ -1,4 +1,4 @@
-package main
+package models
 
 import (
 	"encoding/json"
@@ -44,6 +44,10 @@ type ConfiguredResourceResponseItem struct {
 	Area             string `xml:"Area"`
 }
 
+type AllocationLinkedList struct {
+	Head *AllocationItem
+	Tail *AllocationItem
+}
 type ResourceAllocationStruct struct {
 	PrevNode              *ResourceAllocationStruct
 	NextNode              *ResourceAllocationStruct
@@ -158,6 +162,257 @@ type Users struct {
 	Users []UserProfile `json:"users"`
 }
 
+type ResourceLinkedList struct {
+	Head *ResourceAllocationStruct
+	Tail *ResourceAllocationStruct
+}
+
+func (ll *ResourceLinkedList) AddAllocation(node AllocationItem) {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		if currentNode.Resource.Name == node.ResourceID {
+			currentNode.FlightAllocationsList.AddNode(node)
+			break
+		}
+		currentNode = currentNode.NextNode
+	}
+}
+
+func (ll *FlightLinkedList) ReplaceOrAddNode(node Flight) {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		if currentNode.GetFlightID() == node.GetFlightID() {
+			// Replace the entire node
+			node.PrevNode = currentNode.PrevNode
+			node.NextNode = currentNode.NextNode
+
+			if currentNode.PrevNode != nil {
+				currentNode.PrevNode.NextNode = &node
+			} else {
+				ll.Head = &node
+			}
+
+			if currentNode.NextNode != nil {
+				currentNode.NextNode.PrevNode = &node
+			} else {
+				ll.Tail = &node
+			}
+
+			currentNode.PrevNode = nil
+			currentNode.NextNode = nil
+
+			return // Node found and replaced, exit the function
+		}
+		currentNode = currentNode.NextNode
+	}
+}
+
+func (ll *ResourceLinkedList) AddNodes(nodes []FixedResource) {
+	for _, node := range nodes {
+		newNode := ResourceAllocationStruct{Resource: node}
+		ll.AddNode(newNode)
+	}
+}
+func (ll *ResourceLinkedList) AddNode(newNode ResourceAllocationStruct) {
+
+	newNode.PrevNode = ll.Tail
+	newNode.NextNode = nil
+
+	if ll.Tail != nil {
+		ll.Tail.NextNode = &newNode
+	}
+
+	ll.Tail = &newNode
+
+	if ll.Head == nil {
+		ll.Head = &newNode
+	}
+}
+func (ll *FlightLinkedList) RemoveExpiredNode(from time.Time) {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		if currentNode.GetSDO().Before(from) {
+			if currentNode.PrevNode != nil {
+				currentNode.PrevNode.NextNode = currentNode.NextNode
+			} else {
+				ll.Head = currentNode.NextNode
+			}
+
+			if currentNode.NextNode != nil {
+				currentNode.NextNode.PrevNode = currentNode.PrevNode
+			} else {
+				ll.Tail = currentNode.PrevNode
+			}
+
+			currentNode.PrevNode = nil
+			currentNode.NextNode = nil
+
+			return // Node found and removed, exit the function
+		}
+
+		currentNode = currentNode.NextNode
+	}
+}
+
+func (ll *ResourceLinkedList) RemoveFlightAllocation(flightID string) {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		currentNode.FlightAllocationsList.RemoveFlightAllocations(flightID)
+		currentNode = currentNode.NextNode
+	}
+}
+func (ll *AllocationLinkedList) RemoveFlightAllocations(flightID string) {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		if currentNode.FlightID == flightID {
+
+			if currentNode.PrevNode != nil {
+				currentNode.PrevNode.NextNode = currentNode.NextNode
+			} else {
+				ll.Head = currentNode.NextNode
+			}
+
+			if currentNode.NextNode != nil {
+				currentNode.NextNode.PrevNode = currentNode.PrevNode
+			} else {
+				ll.Tail = currentNode.PrevNode
+			}
+
+			currentNode.PrevNode = nil
+			currentNode.NextNode = nil
+
+			//return // Node found and removed, exit the function
+		}
+
+		currentNode = currentNode.NextNode
+	}
+}
+
+func (ll *ResourceLinkedList) Len() int {
+	currentNode := ll.Head
+	count := 0
+
+	for currentNode != nil {
+		count++
+		currentNode = currentNode.NextNode
+	}
+
+	return count
+}
+
+func (ll *ResourceLinkedList) NumberOfFlightAllocations() (n int) {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		n = n + currentNode.FlightAllocationsList.Len()
+		currentNode = currentNode.NextNode
+	}
+	return
+}
+
+func (ll *FlightLinkedList) RemoveNode(removeNode Flight) {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		if currentNode.GetFlightID() == removeNode.GetFlightID() {
+			if currentNode.PrevNode != nil {
+				currentNode.PrevNode.NextNode = currentNode.NextNode
+			} else {
+				ll.Head = currentNode.NextNode
+			}
+
+			if currentNode.NextNode != nil {
+				currentNode.NextNode.PrevNode = currentNode.PrevNode
+			} else {
+				ll.Tail = currentNode.PrevNode
+			}
+
+			currentNode.PrevNode = nil
+			currentNode.NextNode = nil
+
+			return // Node found and removed, exit the function
+		}
+
+		currentNode = currentNode.NextNode
+	}
+}
+
+func (r *Repository) RemoveFlightAllocation(flightID string) {
+	r.CheckInList.RemoveFlightAllocation(flightID)
+	r.GateList.RemoveFlightAllocation(flightID)
+	r.StandList.RemoveFlightAllocation(flightID)
+	r.CarouselList.RemoveFlightAllocation(flightID)
+	r.ChuteList.RemoveFlightAllocation(flightID)
+}
+
+func (ll *AllocationLinkedList) Len() int {
+	currentNode := ll.Head
+	count := 0
+
+	for currentNode != nil {
+		count++
+		currentNode = currentNode.NextNode
+	}
+
+	return count
+}
+
+func (ll *FlightLinkedList) Len() int {
+	currentNode := ll.Head
+	count := 0
+
+	for currentNode != nil {
+		count++
+		currentNode = currentNode.NextNode
+	}
+
+	return count
+}
+
+// AddNode adds a new node to the end of the doubly linked list.
+func (ll *FlightLinkedList) AddNode(newNode Flight) {
+
+	newNode.PrevNode = ll.Tail
+	newNode.NextNode = nil
+
+	if ll.Tail != nil {
+		ll.Tail.NextNode = &newNode
+	}
+
+	ll.Tail = &newNode
+
+	if ll.Head == nil {
+		ll.Head = &newNode
+	}
+}
+
+func (ll *AllocationLinkedList) AddNode(newNode AllocationItem) {
+
+	newNode.PrevNode = ll.Tail
+	newNode.NextNode = nil
+
+	if ll.Tail != nil {
+		ll.Tail.NextNode = &newNode
+	}
+
+	ll.Tail = &newNode
+
+	if ll.Head == nil {
+		ll.Head = &newNode
+	}
+}
+
+// FlightLinkedList represents the doubly linked list.
+type FlightLinkedList struct {
+	Head *Flight
+	Tail *Flight
+}
+
 type Repository struct {
 	AMSAirport                          string `json:"AMSAirport"`
 	AMSSOAPServiceURL                   string `json:"AMSSOAPServiceURL"`
@@ -234,10 +489,10 @@ type ResourceResponse struct {
 	ConfiguredResources []ConfiguredResourceResponseItem `json:"ConfiguredResources,omitempty"`
 }
 
-func (r *Repository) updateLowerLimit(t time.Time) {
+func (r *Repository) UpdateLowerLimit(t time.Time) {
 	r.CurrentLowerLimit = t
 }
-func (r *Repository) updateUpperLimit(t time.Time) {
+func (r *Repository) UpdateUpperLimit(t time.Time) {
 	r.CurrentUpperLimit = t
 }
 func (r *Response) AddWarning(w string) {
@@ -288,4 +543,25 @@ func (d AllocationResponseItem) MarshalJSON() ([]byte, error) {
 	s := CleanJSON(sb)
 
 	return []byte(s), nil
+}
+
+func CleanJSON(sb strings.Builder) string {
+
+	s := sb.String()
+	if last := len(s) - 1; last >= 0 && s[last] == ',' {
+		s = s[:last]
+	}
+
+	s = s + "}"
+
+	return s
+}
+
+type GetFlightsError struct {
+	StatusCode int
+	Err        error
+}
+
+func (r *GetFlightsError) Error() string {
+	return fmt.Sprintf("status %d: err %v", r.StatusCode, r.Err)
 }
