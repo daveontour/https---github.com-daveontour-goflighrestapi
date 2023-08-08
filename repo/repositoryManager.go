@@ -125,10 +125,13 @@ func initRepository(airportCode string) {
 		}
 	}
 
-	populateResourceMaps(airportCode)
-
 	// The Maintence job schedules a repository population which inits the system
-	go maintainRepository(airportCode)
+	if globals.ConfigViper.GetBool("PerfTestOnly") {
+		//go test.SendUpdateMessages(5000)
+	} else {
+		populateResourceMaps(airportCode)
+		go maintainRepository(airportCode)
+	}
 }
 
 func populateResourceMaps(airportCode string) {
@@ -196,7 +199,7 @@ Reconnect:
 			globals.Logger.Debug(fmt.Sprintf("Received Message length %d\n", len(message)))
 
 			if strings.Contains(message, "FlightUpdatedNotification") {
-				go updateFlightEntry(message)
+				go UpdateFlightEntry(message)
 				continue
 			}
 			if strings.Contains(message, "FlightCreatedNotification") {
@@ -264,10 +267,10 @@ func updateRepository(airportCode string) {
 		for _, flight := range envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight {
 			flight.LastUpdate = time.Now()
 			flight.Action = globals.StatusAction
-			globals.MapMutex.Lock()
+			//	globals.MapMutex.Lock()
 			(*repo).FlightLinkedList.ReplaceOrAddNode(flight)
 			upadateAllocation(flight, airportCode)
-			globals.MapMutex.Unlock()
+			//	globals.MapMutex.Unlock()
 		}
 
 		globals.FlightsInitChannel <- len(envel.Body.GetFlightsResponse.GetFlightsResult.WebServiceResult.ApiResponse.Data.Flights.Flight)
@@ -286,13 +289,14 @@ func updateRepository(airportCode string) {
 func cleanRepository(from time.Time, airportCode string) {
 
 	// Cleans the repository of old entries
-	globals.MapMutex.Lock()
-	defer globals.MapMutex.Unlock()
+	// globals.MapMutex.Lock()
+	// defer globals.MapMutex.Unlock()
 
 	globals.Logger.Info(fmt.Sprintf("Cleaning repository from: %s", from))
 	GetRepo(airportCode).FlightLinkedList.RemoveExpiredNode(from)
 }
-func updateFlightEntry(message string) {
+
+func UpdateFlightEntry(message string) {
 
 	var envel models.FlightUpdatedNotificatioEnvelope
 	xml.Unmarshal([]byte(message), &envel)
@@ -344,22 +348,19 @@ func createFlightEntry(message string) {
 		log.Println("Create for Flight After Window")
 		return
 	}
-	globals.MapMutex.Lock()
+	//globals.MapMutex.Lock()
 	repo.FlightLinkedList.ReplaceOrAddNode(flight)
 	upadateAllocation(flight, airportCode)
-	globals.MapMutex.Unlock()
+	//globals.MapMutex.Unlock()
 
 	globals.FlightCreatedChannel <- flight
 }
 func deleteFlightEntry(message string) {
 
-	//repo := repoMap[airportCode]
-
 	var envel models.FlightDeletedNotificatioEnvelope
 	xml.Unmarshal([]byte(message), &envel)
 
 	flight := envel.Content.FlightDeletedNotification.Flight
-	//flightID := flight.GetFlightID()
 	flight.Action = globals.DeleteAction
 
 	airportCode := flight.GetIATAAirport()
@@ -419,6 +420,7 @@ func upadateAllocation(flight models.Flight, airportCode string) {
 	// Testing with 3000 flights showed unmeasurable time to 500 micro seconds, so no worries mate
 
 	repo := GetRepo(airportCode)
+
 	// It's too messy to do CRUD operations, so just delete all the allocations and then create them again from the current message
 	(*repo).RemoveFlightAllocation(flight.GetFlightID())
 
@@ -520,23 +522,7 @@ func upadateAllocation(flight models.Flight, airportCode string) {
 
 		(*repo).ChuteList.AddAllocation(allocation)
 	}
-
-	//fmt.Printf("FlightLinked List: %T, %d %d\n", repo.FlightLinkedList, repo.FlightLinkedList.Len(), unsafe.Sizeof(repo.FlightLinkedList))
-
 }
-
-// func deleteAllocation(flight Flight, airportCode string) {
-
-// 	GetRepo(airportCode).RemoveFlightAllocation(flight.GetFlightID())
-// 	flightId := flight.GetFlightID()
-
-// 	(*repo).CheckInList.RemoveFlightAllocation(flightId)
-// 	(*repo).GateList.RemoveFlightAllocation(flightId)
-// 	(*repo).StandList.RemoveFlightAllocation(flightId)
-// 	(*repo).CarouselList.RemoveFlightAllocation(flightId)
-// 	(*repo).ChuteList.RemoveFlightAllocation(flightId)
-
-// }
 
 // Retrieve resources from AMS
 func getResource(airportCode string, resourceType string) []byte {

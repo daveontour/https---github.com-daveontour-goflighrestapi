@@ -8,7 +8,7 @@
   </p>
   <p>
     /getFlights<br />
-    /getResources<br />
+    /getAllocations<br />
     /getConfiguredResources<br />
   </p>
   <p>
@@ -97,7 +97,7 @@
   <strong>/getFlights/APT?Sh--_GroundHandler=EAS</strong><br />
   <p>&nbsp;</p>
 
-  <p><span style="font-size:20px"><strong>/getResources/[Airport]?{options}</strong></span></p>
+  <p><span style="font-size:20px"><strong>/getAllocations/[Airport]?{options}</strong></span></p>
   <p>Retreive flights allocated to resources</p>
 
   <table border="1" cellpadding="1" cellspacing="1" style="width:1050px">
@@ -110,34 +110,34 @@
       <tr>
         <td style="width:190px"><strong>Airport</strong></td>
         <td style="width:600px">Three letter IATA airport code to the desired airport</td>
-        <td style="width:260px">/getResources/APT</td>
+        <td style="width:260px">/getAllocations/APT</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>flt or flight</strong></td>
         <td style="width:600px">Flight Number, eg. QF001, EK23, BA007 (default: all flights)</td>
-        <td style="width:260px">/getResources/APT?flt=QF001</td>
+        <td style="width:260px">/getAllocations/APT?flt=QF001</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>al or airline</strong></td>
         <td style="width:600px">Two letter IATA code for the airline, eg. BA, DL, LH, MH (default: all airlines)</td>
-        <td style="width:260px">/getResources/APT?flt=QF</td>
+        <td style="width:260px">/getAllocations/APT?flt=QF</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>rt or resourceType</strong></td>
         <td style="width:600px">One of CheckIn, Gate, Stand, Carousel, Chute. (default: all types are returned)</td>
-        <td style="width:260px">/getResources/APT?rt=Gate</td>
+        <td style="width:260px">/getAllocations/APT?rt=Gate</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>id or resource</strong></td>
         <td style="width:600px">The name of the individual reource to query. Query must include the resourceType
           parameter (default: all resources)</td>
-        <td style="width:260px">/getResources/APT?rt=Gate&amp;id=100</td>
+        <td style="width:260px">/getAllocations/APT?rt=Gate&amp;id=100</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>from</strong></td>
         <td style="width:600px">Number of hours relative to 'now' to start looking for allocations, eg. -3 (default:
           -12)</td>
-        <td style="width:260px">getResources/APT?from=-12</td>
+        <td style="width:260px">getAllocations/APT?from=-12</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>to</strong></td>
@@ -148,12 +148,12 @@
       <tr>
         <td style="width:190px"><strong>sort</strong></td>
         <td style="width:600px">Either "resource" or "time" to specify the sort order of the allocations returned (default: resource)</td>
-        <td style="width:260px">/getResources/APT?sort=time</td>
+        <td style="width:260px">/getAllocations/APT?sort=time</td>
       </tr>
       <tr>
         <td style="width:190px"><strong>updatedSince</strong></td>
         <td style="width:600px">Return records that have been updated from the date, e.g. 2023-07-16T13:00:00</td>
-        <td style="width:260px">getResources/APT?upatedSince=2023-07-16T13:00:00</td>
+        <td style="width:260px">/getAllocations/APT?upatedSince=2023-07-16T13:00:00</td>
       </tr>
   
    

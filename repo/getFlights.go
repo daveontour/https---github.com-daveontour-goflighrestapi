@@ -227,7 +227,7 @@ func processCustomFieldQueries(request models.Request, response models.Response,
 
 	// Remove any queries against unauthorised fields
 	remove := []string{}
-	for k, _ := range customFieldQureyMap {
+	for k := range customFieldQureyMap {
 		if !globals.Contains(request.UserProfile.AllowedCustomFields, k) && !globals.Contains(request.UserProfile.AllowedCustomFields, "*") {
 			remove = append(remove, k)
 		}
@@ -411,7 +411,7 @@ func prune(flights []models.Flight, request models.Request) (flDups []models.Fli
 					data := flight.GetProperty(property)
 
 					if data != "" {
-						flDup.FlightState.Value = append(flDup.FlightState.Value, models.Value{property, data})
+						flDup.FlightState.Value = append(flDup.FlightState.Value, models.Value{PropertyName: property, Text: data})
 					}
 				}
 			}

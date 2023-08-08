@@ -10,8 +10,10 @@ import (
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/models"
 	"flightresourcerestapi/repo"
+	"flightresourcerestapi/test"
 	"fmt"
 	"io"
+	"strconv"
 
 	"math/big"
 	"net/http"
@@ -40,7 +42,7 @@ func StartGinServer() {
 		router.POST("/test", testQuery)
 	}
 	router.GET("/getFlights/:apt", repo.GetRequestedFlightsAPI)
-	router.GET("/getResources/:apt", repo.GetResourceAPI)
+	router.GET("/getAllocations/:apt", repo.GetResourceAPI)
 	router.GET("/getConfiguredResources/:apt/:resourceType", repo.GetConfiguredResources)
 	router.GET("/getConfiguredResources/:apt", repo.GetConfiguredResources)
 
@@ -82,6 +84,29 @@ func StartGinServer() {
 		}
 		c.Header("Content-Type", "text/html")
 		_, _ = c.Writer.Write(data)
+	})
+
+	router.GET("/admin/perftest/:num", func(c *gin.Context) {
+		if hasAdminToken(c) {
+			num := c.Param("num")
+			nf, _ := strconv.Atoi(num)
+			test.SendUpdateMessages(nf)
+
+			c.JSON(http.StatusOK, gin.H{"PerformanceTest": fmt.Sprintf("Done")})
+		} else {
+			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		}
+	})
+
+	router.GET("/admin/perftestinit/:num", func(c *gin.Context) {
+		if hasAdminToken(c) {
+			num := c.Param("num")
+			nf, _ := strconv.Atoi(num)
+			test.PerfTestInit(nf)
+			c.JSON(http.StatusOK, gin.H{"PerformanceTest": fmt.Sprintf("Done")})
+		} else {
+			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+		}
 	})
 
 	// router.GET("/memTest", func(c *gin.Context) {
@@ -278,35 +303,6 @@ func rescheduleAllAptJobs(c *gin.Context) {
 	// push.ReloadschedulePushes(apt)
 	// globals.Logger.Info(fmt.Sprintf("Rescheduled All Aiport Jobs Stopped for %s", apt))
 }
-
-// func getUserProfile(c *gin.Context, userToken string) models.UserProfile {
-
-// 	defer globals.ExeTime("Getting User Profile")()
-
-// 	key := userToken
-
-// 	if c != nil {
-// 		keys := c.Request.Header["Token"]
-// 		key = "default"
-
-// 		if keys != nil {
-// 			key = keys[0]
-// 		}
-
-// 	}
-// 	users := globals.GetUserProfiles()
-// 	userProfile := models.UserProfile{}
-
-// 	for _, u := range users {
-// 		if key == u.Key {
-// 			userProfile = u
-// 			break
-// 		}
-// 	}
-
-// 	return userProfile
-
-// }
 
 // Function to just write what was recieved by the server
 func testQuery(c *gin.Context) {

@@ -5,7 +5,7 @@
             "UserName": "Default User",
             "Key": "default",
             "AllowedAirports": [
-                "AUH"
+                "AUH", "APT"
             ],
             "AllowedAirlines": [
                 "WY",
@@ -21,7 +21,7 @@
             ],
             "UserChangeSubscriptions": [
                 {
-                    "Enabled": true,
+                    "Enabled": false,
                     "Airport": "AUH",
                     "DestinationURL": "http://localhost:8081/test",
                     "HeaderParameters": [],
@@ -42,7 +42,7 @@
             ],
             "UserPushSubscriptions": [
                 {
-                    "Enabled": true,
+                    "Enabled": false,
                     "PushOnStartUp": true,
                     "Airport": "AUH",
                     "DestinationURL": "http://localhost:8081/test",

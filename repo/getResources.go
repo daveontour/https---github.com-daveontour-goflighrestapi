@@ -160,8 +160,8 @@ func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to
 	}
 
 	//Check that the user is allowed to access the requested airport
-	if !globals.Contains(userProfile.AllowedAirlines, apt) &&
-		!globals.Contains(userProfile.AllowedAirlines, "*") {
+	if !globals.Contains(userProfile.AllowedAirports, apt) &&
+		!globals.Contains(userProfile.AllowedAirports, "*") {
 		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("User is not permitted to access airport"),

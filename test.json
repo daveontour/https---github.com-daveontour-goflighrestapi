@@ -1,0 +1,65 @@
+{
+    "TestConfig": 
+        {
+            "Repository": {
+                "AMSAirport": "APT",
+                "AMSToken": "0ab7d73d-e93a-480b-ba8c-a35943161cb0",
+                "AMSSOAPServiceURL": "http://localhost/SITAAMSIntegrationService/v2/SITAAMSIntegrationService",
+                "AMSRestServiceURL": "http://localhost/api/v1/",
+                "FlightSDOWindowMinimumInDaysFromNow": -3,
+                "FlightSDOWindowMaximumInDaysFromNow": 20,
+                "NotificationListenerQueue": ".\\private$\\tow_tracker",
+                "LoadFlightChunkSizeInDays": 4
+            },
+            "CheckinAreas": [
+                {
+                    "Area": "A",
+                    "Number": 50
+                },
+                {
+                    "Area": "B",
+                    "Number": 50
+                }
+            ],
+            "GateAreas": [
+                {
+                    "Area": "A",
+                    "Number": 50
+                },
+                {
+                    "Area": "B",
+                    "Number": 50
+                }
+            ],
+            "StandAreas": [
+                {
+                    "Area": "A",
+                    "Number": 50
+                },
+                {
+                    "Area": "B",
+                    "Number": 50
+                }
+            ],
+            "CarouselAreas": [
+                {
+                    "Area": "T1",
+                    "Number": 10
+                },
+                {
+                    "Area": "T2",
+                    "Number": 8
+                }
+            ],
+            "ChuteAreas": [
+                {
+                    "Area": "T1",
+                    "Number": 20
+                }
+            ],
+            "Airlines": [
+                "XX",
+                "YY"
+            ]
+        }
+}
