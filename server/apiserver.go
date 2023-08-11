@@ -230,6 +230,12 @@ func metricsReport(c *gin.Context) {
 
 	repo := repo.GetRepo(apt)
 
+	if repo == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("Airport not found")})
+		return
+
+	}
+
 	metrics.NumberOfFlights = (*repo).FlightLinkedList.Len()
 	metrics.NumberOfCheckins = (*repo).CheckInList.Len()
 

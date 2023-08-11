@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/repo"
 	"flightresourcerestapi/server"
+	"flightresourcerestapi/test"
 	"flightresourcerestapi/timeservice"
 
 	log "github.com/sirupsen/logrus"
@@ -45,6 +47,11 @@ func main() {
 		globals.IsDebug = true
 		splash()
 		runService(svcName, true)
+		return
+	case "perftest":
+		globals.IsDebug = true
+		splash()
+		perfTest(os.Args[2])
 		return
 	case "install":
 		err = installService(svcName, globals.ConfigViper.GetString("ServicDisplayName"), globals.ConfigViper.GetString("ServiceDescription"))
@@ -90,6 +97,11 @@ func splash() {
 	fmt.Println("*  See help.html for API usage                        *")
 	fmt.Println("*  See adminhelp.html for configuration usage         *")
 	fmt.Println("*                                                     *")
+
+	if globals.ConfigViper.GetBool("PerfTestOnly") {
+		fmt.Println("*  WARNING! - Running in performance Test Mode        *")
+		fmt.Println("*                                                     *")
+	}
 	fmt.Println("*******************************************************")
 	fmt.Println()
 }
@@ -249,7 +261,6 @@ func runService(name string, isDebug bool) {
 	}
 	globals.Logger.Info(fmt.Sprintf("%s service stopped", name))
 }
-
 func runProgram() {
 
 	numCPU := runtime.NumCPU()
@@ -275,6 +286,35 @@ func runProgram() {
 		globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
 	}
 	globals.UserChangeSubscriptionsMutex.Unlock()
+	globals.Wg.Wait()
+}
+func perfTest(numFlightsSt string) {
+
+	numCPU := runtime.NumCPU()
+
+	globals.ConfigViper.Set("PerfTestOnly", true)
+
+	globals.Logger.Debug(fmt.Sprintf("Number of cores available = %v", numCPU))
+
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	//Wait group so the program doesn't exit
+	globals.Wg.Add(1)
+
+	// The HTTP Server
+	go server.StartGinServer()
+
+	// Handler for the different types of messages passed by channels
+	go eventMonitor()
+
+	// Initiate the User Change Subscriptions
+	globals.UserChangeSubscriptionsMutex.Lock()
+	for _, up := range globals.GetUserProfiles() {
+		globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
+	}
+	globals.UserChangeSubscriptionsMutex.Unlock()
+
+	numFlights, _ := strconv.Atoi(numFlightsSt)
+	test.PerfTestInit(numFlights)
 	globals.Wg.Wait()
 }
 

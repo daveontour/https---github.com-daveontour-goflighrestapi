@@ -7,8 +7,12 @@
             "AMSRestServiceURL": "http://localhost/api/v1/",
             "FlightSDOWindowMinimumInDaysFromNow": -3,
             "FlightSDOWindowMaximumInDaysFromNow": 20,
+            "ListenerType":"RMQ",
             "NotificationListenerQueue": ".\\private$\\tow_tracker",
-            "LoadFlightChunkSizeInDays": 4
+            "LoadFlightChunkSizeInDays": 4,
+            "RabbitMQConnectionString": "amqp://amsauh:amsauh@localhost:5672/amsauh",
+            "RabbitMQExchange": "Test",
+            "RabbitMQTopic": "AMSX.Notify"
         }
     ]
 }

@@ -387,6 +387,9 @@ type Repository struct {
 	FlightSDOWindowMinimumInDaysFromNow int    `json:"FlightSDOWindowMinimumInDaysFromNow"`
 	FlightSDOWindowMaximumInDaysFromNow int    `json:"FlightSDOWindowMaximumInDaysFromNow"`
 	ListenerType                        string `json:"ListenerType"`
+	RabbitMQConnectionString            string `json:"RabbitMQConnectionString"`
+	RabbitMQExchange                    string `json:"RabbitMQExchange"`
+	RabbitMQTopic                       string `json:"RabbitMQTopic"`
 	NotificationListenerQueue           string `json:"NotificationListenerQueue"`
 	LoadFlightChunkSizeInDays           int    `json:"LoadFlightChunkSizeInDays"`
 	FlightLinkedList                    FlightLinkedList

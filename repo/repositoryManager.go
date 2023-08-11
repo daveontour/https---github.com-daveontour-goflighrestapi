@@ -16,6 +16,8 @@ import (
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/models"
 	"flightresourcerestapi/timeservice"
+
+	amqp "github.com/rabbitmq/amqp091-go"
 )
 
 const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ams6="http://www.sita.aero/ams6-xml-api-webservice">
@@ -63,9 +65,11 @@ func InitRepositories() {
 		fmt.Println(err)
 	}
 
-	for _, v := range repos.Repositories {
-		globals.RepoList = append(globals.RepoList, v)
-		go initRepository(v.AMSAirport)
+	if !globals.ConfigViper.GetBool("PerfTestOnly") {
+		for _, v := range repos.Repositories {
+			globals.RepoList = append(globals.RepoList, v)
+			go initRepository(v.AMSAirport)
+		}
 	}
 }
 
@@ -95,42 +99,47 @@ func initRepository(airportCode string) {
 
 	defer globals.ExeTime(fmt.Sprintf("Initialising Repository for %s", airportCode))()
 
-	//Make sure the required services are available
-	for !testNativeAPIConnectivity(airportCode) || !testRestAPIConnectivity(airportCode) {
-		globals.Logger.Warn(fmt.Sprintf("AMS Webservice API or AMS RestAPI not avaiable for %s. Will try again in 8 seconds", airportCode))
-		time.Sleep(8 * time.Second)
-	}
-
-	// Purge the listening queue first before doing the Initializarion of the repository
-	opts := []msmq.QueueInfoOption{
-		msmq.WithPathName(GetRepo(airportCode).NotificationListenerQueue),
-	}
-	queueInfo, err := msmq.NewQueueInfo(opts...)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	queue, err := queueInfo.Open(msmq.Receive, msmq.DenyNone)
-
-	if err == nil {
-		purgeErr := queue.Purge()
-		if purgeErr != nil {
-			if globals.IsDebug {
-				globals.Logger.Error("Error purging listening queue")
-			}
-		} else {
-			if globals.IsDebug {
-				globals.Logger.Info("Listening queue purged OK")
-			}
-		}
-	}
-
-	// The Maintence job schedules a repository population which inits the system
 	if globals.ConfigViper.GetBool("PerfTestOnly") {
 		//go test.SendUpdateMessages(5000)
+
 	} else {
+		//Make sure the required services are available
+		for !testNativeAPIConnectivity(airportCode) || !testRestAPIConnectivity(airportCode) {
+			globals.Logger.Warn(fmt.Sprintf("AMS Webservice API or AMS RestAPI not avaiable for %s. Will try again in 8 seconds", airportCode))
+			time.Sleep(8 * time.Second)
+		}
+
+		repo := GetRepo(airportCode)
+
+		if repo.ListenerType == "MSMQ" {
+			// Purge the listening queue first before doing the Initializarion of the repository
+			opts := []msmq.QueueInfoOption{
+				msmq.WithPathName(GetRepo(airportCode).NotificationListenerQueue),
+			}
+			queueInfo, err := msmq.NewQueueInfo(opts...)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			queue, err := queueInfo.Open(msmq.Receive, msmq.DenyNone)
+
+			if err == nil {
+				purgeErr := queue.Purge()
+				if purgeErr != nil {
+					if globals.IsDebug {
+						globals.Logger.Error("Error purging listening queue")
+					}
+				} else {
+					if globals.IsDebug {
+						globals.Logger.Info("Listening queue purged OK")
+					}
+				}
+			}
+		}
+
+		// The Maintence job schedules a repository population which inits the system
 		populateResourceMaps(airportCode)
-		go maintainRepository(airportCode)
+		go MaintainRepository(airportCode)
 	}
 }
 
@@ -163,54 +172,132 @@ func populateResourceMaps(airportCode string) {
 	globals.Logger.Info(fmt.Sprintf("Completed Populating Resource Maps for %s", airportCode))
 }
 
-func maintainRepository(airportCode string) {
+func MaintainRepository(airportCode string) {
 
 	// Schedule the regular refresh
 	go scheduleUpdates(airportCode)
 
-	//Listen to the notification queue
-	opts := []msmq.QueueInfoOption{
-		msmq.WithPathName(GetRepo(airportCode).NotificationListenerQueue),
-	}
-	queueInfo, err := msmq.NewQueueInfo(opts...)
-	if err != nil {
-		log.Fatal(err)
-	}
+	repo := GetRepo(airportCode)
 
-Reconnect:
-	for {
-
-		queue, err := queueInfo.Open(msmq.Receive, msmq.DenyNone)
+	if repo.ListenerType == "MSMQ" {
+		//Listen to the notification queue
+		opts := []msmq.QueueInfoOption{
+			msmq.WithPathName(GetRepo(airportCode).NotificationListenerQueue),
+		}
+		queueInfo, err := msmq.NewQueueInfo(opts...)
 		if err != nil {
-			globals.Logger.Error(err)
-			continue Reconnect
+			log.Fatal(err)
 		}
 
+	ReconnectMSMQ:
 		for {
 
-			msg, err := queue.Receive() //This call blocks until a message is available
+			queue, err := queueInfo.Open(msmq.Receive, msmq.DenyNone)
 			if err != nil {
 				globals.Logger.Error(err)
-				continue Reconnect
+				continue ReconnectMSMQ
 			}
 
-			message, _ := msg.Body()
+			for {
 
-			globals.Logger.Debug(fmt.Sprintf("Received Message length %d\n", len(message)))
+				msg, err := queue.Receive() //This call blocks until a message is available
+				if err != nil {
+					globals.Logger.Error(err)
+					continue ReconnectMSMQ
+				}
 
-			if strings.Contains(message, "FlightUpdatedNotification") {
-				go UpdateFlightEntry(message)
-				continue
-			}
-			if strings.Contains(message, "FlightCreatedNotification") {
-				go createFlightEntry(message)
-				continue
-			}
-			if strings.Contains(message, "FlightDeletedNotification") {
-				go deleteFlightEntry(message)
-				continue
+				message, _ := msg.Body()
+
+				globals.Logger.Debug(fmt.Sprintf("Received Message length %d\n", len(message)))
+
+				if strings.Contains(message, "FlightUpdatedNotification") {
+					go UpdateFlightEntry(message)
+					continue
+				}
+				if strings.Contains(message, "FlightCreatedNotification") {
+					go createFlightEntry(message)
+					continue
+				}
+				if strings.Contains(message, "FlightDeletedNotification") {
+					go deleteFlightEntry(message)
+					continue
+				}
 			}
 		}
+	} else if repo.ListenerType == "RMQ" {
+		conn, err := amqp.Dial(repo.RabbitMQConnectionString)
+		failOnError(err, "Failed to connect to RabbitMQ")
+		defer conn.Close()
+
+		ch, err := conn.Channel()
+		failOnError(err, "Failed to open a channel")
+		defer ch.Close()
+
+		//the session queue that will receive the messages from the Topic publisher
+		q, err := ch.QueueDeclare(
+			"",    // name
+			false, // durable
+			false, // delete when unused
+			true,  // exclusive
+			false, // no-wait
+			nil,   // arguments
+		)
+		failOnError(err, "Failed to declare a queue")
+
+		log.Printf("Binding queue %s to exchange %s with routing key %s", q.Name, repo.RabbitMQExchange, repo.RabbitMQTopic)
+
+		// Bind the seession queue to the Publisher
+		err = ch.QueueBind(
+			q.Name,                // queue name
+			repo.RabbitMQTopic,    // routing key
+			repo.RabbitMQExchange, // exchange
+			false,
+			nil)
+		failOnError(err, "Failed to bind a queue")
+
+		msgs, err := ch.Consume(
+			q.Name, // queue
+			"",     // consumer
+			true,   // auto ack
+			false,  // exclusive
+			false,  // no local
+			false,  // no wait
+			nil,    // args
+		)
+		failOnError(err, "Failed to register a consumer")
+
+		var forever chan struct{}
+
+		// Read the messages from the queue
+		go func() {
+			for d := range msgs {
+				globals.Logger.Debug("Rabbit Message Received")
+				message := string(d.Body[:])
+
+				globals.Logger.Debug(fmt.Sprintf("Received Message length %d\n", len(message)))
+
+				if strings.Contains(message, "FlightUpdatedNotification") {
+					go UpdateFlightEntry(message)
+					continue
+				}
+				if strings.Contains(message, "FlightCreatedNotification") {
+					go createFlightEntry(message)
+					continue
+				}
+				if strings.Contains(message, "FlightDeletedNotification") {
+					go deleteFlightEntry(message)
+					continue
+				}
+			}
+		}()
+
+		log.Printf(" [*] Waiting for logs. To exit press CTRL+C")
+		<-forever
+	}
+}
+func failOnError(err error, msg string) {
+	if err != nil {
+		log.Panicf("%s: %s", msg, err)
 	}
 }
 func scheduleUpdates(airportCode string) {
@@ -305,6 +392,11 @@ func UpdateFlightEntry(message string) {
 
 	airportCode := flight.GetIATAAirport()
 	repo := GetRepo(airportCode)
+
+	if repo == nil {
+		globals.Logger.Warn(fmt.Sprintf("Message for unmanaged airport %s received", airportCode))
+		return
+	}
 
 	sdot := flight.GetSDO()
 
