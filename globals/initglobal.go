@@ -94,6 +94,7 @@ func InitGlobals() {
 
 	//serviceConfig = getServiceConfig()
 	IsDebug = ConfigViper.GetBool("DebugService")
+	IsTrace := ConfigViper.GetBool("TraceService")
 
 	initLogging()
 
@@ -108,6 +109,9 @@ func InitGlobals() {
 
 	if IsDebug {
 		Logger.SetLevel(logrus.DebugLevel)
+	}
+	if IsTrace {
+		Logger.SetLevel(logrus.TraceLevel)
 	}
 
 }

@@ -11,7 +11,7 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileDirname}",
-            "args" :["demo", "5000"]
+            "args" :["demo", "50"]
         }
     ]
 }

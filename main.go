@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -14,19 +15,176 @@ import (
 	"flightresourcerestapi/timeservice"
 
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cobra"
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/debug"
 	"golang.org/x/sys/windows/svc/eventlog"
 	"golang.org/x/sys/windows/svc/mgr"
 )
 
+const version = "2.1.0"
+
+var rootCmd = &cobra.Command{
+	Use:   "flightresourcerestapi",
+	Short: `flightresourcerestapi is a CLI to run or manage the flights and resource API`,
+	Long:  `flightresourcerestapi is a CLI to control the execution of the Flight and Resource Rest Service API for AMS`,
+	// Run: func(cmd *cobra.Command, args []string) {
+	// 	globals.IsDebug = true
+	// 	splash(0)
+	// },
+}
+
+var splashCmd = &cobra.Command{
+	Use:   "splash",
+	Short: `Shows the Splash text`,
+	Long:  `Shows the Splash text`,
+	Run: func(cmd *cobra.Command, args []string) {
+		splash(0)
+	},
+}
+
+var runCmd = &cobra.Command{
+	Use:   "run",
+	Short: `Runs the service from the command line`,
+	Long:  `Runs the service from the command line. Administrator access is NOT required (unless using port 80) `,
+	Run: func(cmd *cobra.Command, args []string) {
+		globals.IsDebug = true
+		splash(0)
+		runService(globals.ConfigViper.GetString("ServiceName"), true)
+	},
+}
+var demoCmd = &cobra.Command{
+	Use:   "demo  {number of flights to create}",
+	Short: `Run in Demonstration mode`,
+	Long:  `This will run the system in demonstration mode where resources and flights will be created based on the configuration in test.json`,
+	Run: func(cmd *cobra.Command, args []string) {
+		globals.IsDebug = true
+		splash(2)
+		demo(args[0])
+	},
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("Number of initial flights not specified")
+		}
+		_, err := strconv.Atoi(args[0])
+		if err != nil {
+			return errors.New("Invalid format or invalid number of flights entered on command line")
+		}
+		return nil
+	},
+}
+var perfTestCmd = &cobra.Command{
+	Use:   "perfTest {number of flights to create}",
+	Short: `Run in Performance Testing mode`,
+	Long:  `This will run the system in demonstration mode where resources and flights will be created based on the configuration in test.json`,
+	Run: func(cmd *cobra.Command, args []string) {
+		globals.IsDebug = true
+		splash(0)
+		perfTest(args[1])
+	},
+	Args: func(cmd *cobra.Command, args []string) error {
+		if len(args) < 1 {
+			return errors.New("Number of initial flights not specified")
+		}
+		_, err := strconv.Atoi(args[0])
+		if err != nil {
+			return errors.New("Invalid format or invalid number of flights entered on command line")
+		}
+		return nil
+	},
+}
+
+var installCmd = &cobra.Command{
+	Use:   "install",
+	Short: `Install to run as a Windows Service (Adminstrator Mode Required)`,
+	Long:  `Install the system to run as a Windows Service. Must be logged on as Administrator`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if !amAdmin() {
+			fmt.Println("Administrator privilge required")
+			return
+		}
+		err := installService(globals.ConfigViper.GetString("ServiceName"), globals.ConfigViper.GetString("ServicDisplayName"), globals.ConfigViper.GetString("ServiceDescription"))
+		failOnError(err, fmt.Sprintf("failed to %s %s", "install", globals.ConfigViper.GetString("ServiceName")))
+	},
+}
+var removeCmd = &cobra.Command{
+	Use:   "uninstall",
+	Short: `Uninstalls the system if previously installed as a Windows Service (Adminstrator Mode Required)`,
+	Long:  `Uninstalls the system if previously installed as a Windows Service. Must be logged on as Administrator`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if !amAdmin() {
+			fmt.Println("Administrator privilge required")
+			return
+		}
+		err := removeService(globals.ConfigViper.GetString("ServiceName"))
+		failOnError(err, fmt.Sprintf("failed to %s %s", "uninstall", globals.ConfigViper.GetString("ServiceName")))
+	},
+}
+var startCmd = &cobra.Command{
+	Use:   "start",
+	Short: `Starts the service if previously installed as a Windows Service (Adminstrator Mode Required)`,
+	Long:  `Starts the service if previously installed as a Windows Service. Must be logged on as Administrator`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if !amAdmin() {
+			fmt.Println("Administrator privilge required")
+			return
+		}
+		err := startService(globals.ConfigViper.GetString("ServiceName"))
+		failOnError(err, fmt.Sprintf("failed to %s %s", "start", globals.ConfigViper.GetString("ServiceName")))
+	},
+}
+
+var stopCmd = &cobra.Command{
+	Use:   "stop",
+	Short: `Stops the service if previously installed as a Windows Service (Adminstrator Mode Required)`,
+	Long:  `Stops the service if previously installed as a Windows Service. Must be logged on as Administrator`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if !amAdmin() {
+			fmt.Println("Administrator privilge required")
+			return
+		}
+		err := controlService(globals.ConfigViper.GetString("ServiceName"), svc.Stop, svc.Stopped)
+		failOnError(err, fmt.Sprintf("failed to %s %s", "stop", globals.ConfigViper.GetString("ServiceName")))
+	},
+}
+
+func failOnError(err error, msg string) {
+	if err != nil {
+		log.Panicf("%s: %s", msg, err)
+	}
+}
+
+func amAdmin() bool {
+	_, err := os.Open("\\\\.\\PHYSICALDRIVE0")
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func Execute() {
+	rootCmd.CompletionOptions.DisableDefaultCmd = true
+	rootCmd.Version = version
+
+	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(splashCmd)
+	rootCmd.AddCommand(demoCmd)
+	rootCmd.AddCommand(perfTestCmd)
+	rootCmd.AddCommand(installCmd)
+	rootCmd.AddCommand(removeCmd)
+	rootCmd.AddCommand(startCmd)
+	rootCmd.AddCommand(stopCmd)
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
+}
 func main() {
 
 	// Do a bit of initialisation
 	globals.InitGlobals()
 	timeservice.InitTimeService()
 
-	svcName := globals.ConfigViper.GetString("ServiceName")
 	inService, err := svc.IsWindowsService()
 
 	if err != nil {
@@ -35,73 +193,19 @@ func main() {
 
 	if inService {
 		// Running as a Windows service, so just go ahead and start it all
-		runService(svcName, false)
+		runService(globals.ConfigViper.GetString("ServiceName"), false)
 		return
 	}
 
-	// Not in a service, so process the command line
-	cmd := ""
-	if len(os.Args) >= 2 {
-		cmd = strings.ToLower(os.Args[1])
-	}
+	Execute()
 
-	switch cmd {
-	case "debug":
-		globals.IsDebug = true
-		splash(0)
-		runService(svcName, true)
-		return
-	case "perftest":
-		globals.IsDebug = true
-		splash(1)
-		if len(os.Args) < 3 {
-			fmt.Println("You must specify the number of flights to include in the test")
-			return
-		}
-		perfTest(os.Args[2])
-		return
-	case "demo":
-		globals.IsDebug = true
-		splash(2)
-		if len(os.Args) < 3 {
-			fmt.Println("You must specify the number of flights to include in the demo")
-			return
-		}
-		demo(os.Args[2])
-		return
-	case "install":
-		err = installService(svcName, globals.ConfigViper.GetString("ServicDisplayName"), globals.ConfigViper.GetString("ServiceDescription"))
-	case "remove":
-		err = removeService(svcName)
-	case "start":
-		err = startService(svcName)
-	case "stop":
-		err = controlService(svcName, svc.Stop, svc.Stopped)
-	default:
-		globals.IsDebug = true
-		splash(0)
-		runService(svcName, true)
-
-	}
-	if err != nil {
-		log.Fatalf("failed to %s %s: %v", cmd, svcName, err)
-	}
-	return
-}
-
-func usage(errmsg string) {
-	fmt.Fprintf(os.Stderr,
-		"usage: %s <command>\n"+
-			"       where <command> is one of\n"+
-			"       install, remove, debug, start, stop\n",
-		os.Args[0])
 }
 
 func splash(mode int) {
 	fmt.Println()
 	fmt.Println("*******************************************************")
 	fmt.Println("*                                                     *")
-	fmt.Println("*  AMS Flights and Resources Rest API  (v2.1.0)       *")
+	fmt.Println("*  AMS Flights and Resources Rest API (" + version + ")         * ")
 	fmt.Println("*                                                     *")
 	fmt.Println("*  (This is NOT official SITA Software)               *")
 	fmt.Println("*  (Community Contributed Software)                   *")
@@ -313,9 +417,9 @@ func runProgram() {
 }
 func perfTest(numFlightsSt string) {
 
+	// Start the system in performance test mode. Resources and flights are created as per test.json
+	// Requires Rabbit MQ to be running. Messages are passsed via Rabbit MQ
 	numCPU := runtime.NumCPU()
-
-	globals.ConfigViper.Set("PerfTestOnly", true)
 
 	globals.Logger.Debug(fmt.Sprintf("Number of cores available = %v", numCPU))
 
@@ -343,8 +447,10 @@ func perfTest(numFlightsSt string) {
 
 func demo(numFlightsSt string) {
 
+	// Start the system in demo mode. Resources and flights are created as per test.json
+	// Does not require Rabbit MQ to be running.
 	globals.DemoMode = true
-	globals.ConfigViper.Set("PerfTestOnly", true)
+
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	globals.Wg.Add(1)
 	go server.StartGinServer()
@@ -368,6 +474,8 @@ func demo(numFlightsSt string) {
 
 func eventMonitor() {
 
+	//Acts as an exchange between events and action to be taken on those events
+
 	for {
 		select {
 		case flight := <-globals.FlightUpdatedChannel:
@@ -386,9 +494,7 @@ func eventMonitor() {
 			go repo.HandleFlightCreate(flight)
 
 		case numflight := <-globals.FlightsInitChannel:
-
 			globals.Logger.Trace(fmt.Sprintf("Flight Initialised or Refreshed: %v", numflight))
-
 		}
 	}
 }

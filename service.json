@@ -6,17 +6,17 @@
     "ScheduleUpdateJob": "02:00:00",
     "ScheduleUpdateJobIntervalInHours": 1,
     "DebugService": true,
+    "TraceService": false,
     "UseHTTPS": false,
     "UseHTTPSUntrusted": false,
     "KeyFile": "keyFile",
     "CertFile": "certFile",
-    "TestHTTPServer": false,
+    "TestHTTPServer": true,
     "LogFile": "c:/Users/dave_/Desktop/Logs/process.log",
     "RequestLogFile": "c:/Users/dave_/Desktop/Logs/request.log",
     "MaxLogFileSizeInMB": 50,
     "MaxNumberLogFiles": 3,
     "EnableMetrics": true,
     "MetricsLogFile": "c:/Users/dave_/Desktop/Logs/performance.log",
-    "AdminToken": "davewashere",
-    "PerfTestOnly":true
+    "AdminToken": "davewashere"
 }
