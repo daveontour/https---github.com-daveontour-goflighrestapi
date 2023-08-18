@@ -10,7 +10,7 @@ import (
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/models"
 	"flightresourcerestapi/repo"
-	"flightresourcerestapi/test"
+
 	"fmt"
 	"io"
 	"strconv"
@@ -90,7 +90,7 @@ func StartGinServer() {
 		if hasAdminToken(c) {
 			num := c.Param("num")
 			nf, _ := strconv.Atoi(num)
-			test.SendUpdateMessages(nf)
+			repo.SendUpdateMessages(nf)
 
 			c.JSON(http.StatusOK, gin.H{"PerformanceTest": fmt.Sprintf("Done")})
 		} else {
@@ -102,7 +102,7 @@ func StartGinServer() {
 		if hasAdminToken(c) {
 			num := c.Param("num")
 			nf, _ := strconv.Atoi(num)
-			test.PerfTestInit(nf)
+			repo.PerfTestInit(nf)
 			c.JSON(http.StatusOK, gin.H{"PerformanceTest": fmt.Sprintf("Done")})
 		} else {
 			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})

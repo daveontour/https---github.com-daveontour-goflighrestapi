@@ -20,7 +20,7 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
-const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ams6="http://www.sita.aero/ams6-xml-api-webservice">
+const xmlGetFlightsTemplateBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ams6="http://www.sita.aero/ams6-xml-api-webservice">
 <soapenv:Header/>
 <soapenv:Body>
    <ams6:GetFlights>
@@ -58,18 +58,17 @@ func GetRepo(airportCode string) *models.Repository {
 
 func InitRepositories() {
 
+	// Load the configuration from the airports.json config
 	var repos models.Repositories
-
 	err := globals.AirportsViper.Unmarshal(&repos)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	if !globals.ConfigViper.GetBool("PerfTestOnly") {
-		for _, v := range repos.Repositories {
-			globals.RepoList = append(globals.RepoList, v)
-			go initRepository(v.AMSAirport)
-		}
+	// Add each airport to the global list and then initialise it
+	for _, v := range repos.Repositories {
+		globals.RepoList = append(globals.RepoList, v)
+		go initRepository(v.AMSAirport)
 	}
 }
 
@@ -92,55 +91,57 @@ func ReInitAirport(aptCode string) {
 	}
 
 	go initRepository(aptCode)
-
 }
 
 func initRepository(airportCode string) {
 
 	defer globals.ExeTime(fmt.Sprintf("Initialising Repository for %s", airportCode))()
 
-	if globals.ConfigViper.GetBool("PerfTestOnly") {
-		//go test.SendUpdateMessages(5000)
+	//Make sure the required services are available and loop until they are.
+	//This may occur if this service starts before AMS
+	for !testNativeAPIConnectivity(airportCode) || !testRestAPIConnectivity(airportCode) {
+		globals.Logger.Warn(fmt.Sprintf("AMS Webservice API or AMS RestAPI not avaiable for %s. Will try again in 8 seconds", airportCode))
+		time.Sleep(8 * time.Second)
+	}
 
-	} else {
-		//Make sure the required services are available
-		for !testNativeAPIConnectivity(airportCode) || !testRestAPIConnectivity(airportCode) {
-			globals.Logger.Warn(fmt.Sprintf("AMS Webservice API or AMS RestAPI not avaiable for %s. Will try again in 8 seconds", airportCode))
-			time.Sleep(8 * time.Second)
+	repo := GetRepo(airportCode)
+
+	if repo.ListenerType == "MSMQ" {
+		// Purge the listening queue first before doing the Initializarion of the repository
+		opts := []msmq.QueueInfoOption{
+			msmq.WithPathName(GetRepo(airportCode).NotificationListenerQueue),
+		}
+		queueInfo, err := msmq.NewQueueInfo(opts...)
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		repo := GetRepo(airportCode)
+		queue, err := queueInfo.Open(msmq.Receive, msmq.DenyNone)
 
-		if repo.ListenerType == "MSMQ" {
-			// Purge the listening queue first before doing the Initializarion of the repository
-			opts := []msmq.QueueInfoOption{
-				msmq.WithPathName(GetRepo(airportCode).NotificationListenerQueue),
-			}
-			queueInfo, err := msmq.NewQueueInfo(opts...)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			queue, err := queueInfo.Open(msmq.Receive, msmq.DenyNone)
-
-			if err == nil {
-				purgeErr := queue.Purge()
-				if purgeErr != nil {
-					if globals.IsDebug {
-						globals.Logger.Error("Error purging listening queue")
-					}
-				} else {
-					if globals.IsDebug {
-						globals.Logger.Info("Listening queue purged OK")
-					}
+		if err == nil {
+			purgeErr := queue.Purge()
+			if purgeErr != nil {
+				if globals.IsDebug {
+					globals.Logger.Error("Error purging listening queue")
+				}
+			} else {
+				if globals.IsDebug {
+					globals.Logger.Info("Listening queue purged OK")
 				}
 			}
 		}
-
-		// The Maintence job schedules a repository population which inits the system
-		populateResourceMaps(airportCode)
-		go MaintainRepository(airportCode)
 	}
+
+	// Get the resources from the RestAPI Server
+	populateResourceMaps(airportCode)
+
+	// Schedule the periodic updates and start listening
+	// The listening mechanism is blocking, so has to be a "go" function
+	go MaintainRepository(airportCode, false)
+
+	// Initialise the airport repository
+	loadRepositoryOnStartup(airportCode)
+
 }
 
 func populateResourceMaps(airportCode string) {
@@ -172,10 +173,12 @@ func populateResourceMaps(airportCode string) {
 	globals.Logger.Info(fmt.Sprintf("Completed Populating Resource Maps for %s", airportCode))
 }
 
-func MaintainRepository(airportCode string) {
+func MaintainRepository(airportCode string, perfTest bool) {
 
-	// Schedule the regular refresh
-	go scheduleUpdates(airportCode)
+	if !perfTest {
+		// Schedule the regular refresh, the scheduler is blocking, do it's in a "go"  routine
+		go scheduleUpdates(airportCode)
+	}
 
 	repo := GetRepo(airportCode)
 
@@ -211,7 +214,7 @@ func MaintainRepository(airportCode string) {
 				globals.Logger.Debug(fmt.Sprintf("Received Message length %d\n", len(message)))
 
 				if strings.Contains(message, "FlightUpdatedNotification") {
-					go UpdateFlightEntry(message)
+					go UpdateFlightEntry(message, false)
 					continue
 				}
 				if strings.Contains(message, "FlightCreatedNotification") {
@@ -233,6 +236,18 @@ func MaintainRepository(airportCode string) {
 		failOnError(err, "Failed to open a channel")
 		defer ch.Close()
 
+		// Declare the Exchange which the system will try to match if it exists or create if it doesn't
+		err = ch.ExchangeDeclare(
+			repo.RabbitMQExchange, // exchange
+			"topic",               // routing key
+			true,                  // durable
+			false,                 // auto-deleted
+			false,                 // internal
+			false,                 // no-wait
+			nil,                   // arguments
+		)
+		failOnError(err, "Failed to declare an exchange")
+
 		//the session queue that will receive the messages from the Topic publisher
 		q, err := ch.QueueDeclare(
 			"",    // name
@@ -242,7 +257,7 @@ func MaintainRepository(airportCode string) {
 			false, // no-wait
 			nil,   // arguments
 		)
-		failOnError(err, "Failed to declare a queue")
+		failOnError(err, "Failed to declare the listening queue")
 
 		log.Printf("Binding queue %s to exchange %s with routing key %s", q.Name, repo.RabbitMQExchange, repo.RabbitMQTopic)
 
@@ -277,7 +292,7 @@ func MaintainRepository(airportCode string) {
 				globals.Logger.Debug(fmt.Sprintf("Received Message length %d\n", len(message)))
 
 				if strings.Contains(message, "FlightUpdatedNotification") {
-					go UpdateFlightEntry(message)
+					go UpdateFlightEntry(message, false)
 					continue
 				}
 				if strings.Contains(message, "FlightCreatedNotification") {
@@ -295,11 +310,7 @@ func MaintainRepository(airportCode string) {
 		<-forever
 	}
 }
-func failOnError(err error, msg string) {
-	if err != nil {
-		log.Panicf("%s: %s", msg, err)
-	}
-}
+
 func scheduleUpdates(airportCode string) {
 
 	// Schedule the regular refresh
@@ -316,7 +327,7 @@ func scheduleUpdates(airportCode string) {
 	s.Every(globals.ConfigViper.GetString("ScheduleUpdateJobIntervalInHours")).Hours().StartAt(startTime).Do(func() { updateRepository(airportCode) })
 
 	// Kick off an intial load on startup
-	s.Every(1).Millisecond().LimitRunsTo(1).Do(func() { loadRepositoryOnStartup(airportCode) })
+	//s.Every(1).Millisecond().LimitRunsTo(1).Do(func() { loadRepositoryOnStartup(airportCode) })
 
 	globals.Logger.Info(fmt.Sprintf("Regular updates of the repository have been scheduled at %s for every %v hours", startTimeStr, globals.ConfigViper.GetString("ScheduleUpdateJobIntervalInHours")))
 
@@ -356,7 +367,7 @@ func updateRepository(airportCode string) {
 			flight.Action = globals.StatusAction
 			//	globals.MapMutex.Lock()
 			(*repo).FlightLinkedList.ReplaceOrAddNode(flight)
-			upadateAllocation(flight, airportCode)
+			upadateAllocation(flight, airportCode, false)
 			//	globals.MapMutex.Unlock()
 		}
 
@@ -383,9 +394,9 @@ func cleanRepository(from time.Time, airportCode string) {
 	GetRepo(airportCode).FlightLinkedList.RemoveExpiredNode(from)
 }
 
-func UpdateFlightEntry(message string) {
+func UpdateFlightEntry(message string, append bool) {
 
-	var envel models.FlightUpdatedNotificatioEnvelope
+	var envel models.FlightUpdatedNotificationEnvelope
 	xml.Unmarshal([]byte(message), &envel)
 
 	flight := envel.Content.FlightUpdatedNotification.Flight
@@ -413,15 +424,22 @@ func UpdateFlightEntry(message string) {
 	flight.Action = globals.UpdateAction
 
 	globals.MapMutex.Lock()
-	repo.FlightLinkedList.ReplaceOrAddNode(flight)
-	upadateAllocation(flight, airportCode)
+	if append {
+		repo.FlightLinkedList.AddNode(flight)
+		upadateAllocation(flight, airportCode, true)
+
+	} else {
+		repo.FlightLinkedList.ReplaceOrAddNode(flight)
+		upadateAllocation(flight, airportCode, false)
+
+	}
 	globals.MapMutex.Unlock()
 
 	globals.FlightUpdatedChannel <- flight
 }
 func createFlightEntry(message string) {
 
-	var envel models.FlightCreatedNotificatioEnvelope
+	var envel models.FlightCreatedNotificationEnvelope
 	xml.Unmarshal([]byte(message), &envel)
 
 	flight := envel.Content.FlightCreatedNotification.Flight
@@ -442,14 +460,14 @@ func createFlightEntry(message string) {
 	}
 	//globals.MapMutex.Lock()
 	repo.FlightLinkedList.ReplaceOrAddNode(flight)
-	upadateAllocation(flight, airportCode)
+	upadateAllocation(flight, airportCode, false)
 	//globals.MapMutex.Unlock()
 
 	globals.FlightCreatedChannel <- flight
 }
 func deleteFlightEntry(message string) {
 
-	var envel models.FlightDeletedNotificatioEnvelope
+	var envel models.FlightDeletedNotificationEnvelope
 	xml.Unmarshal([]byte(message), &envel)
 
 	flight := envel.Content.FlightDeletedNotification.Flight
@@ -482,7 +500,7 @@ func getFlights(airportCode string, values ...int) []byte {
 	globals.Logger.Debug(fmt.Sprintf("Getting flight from %s to %s", from, to))
 	fmt.Printf("Getting flights from %s to %s\n", from, to)
 
-	queryBody := fmt.Sprintf(xmlBody, repo.AMSToken, from, to, repo.AMSAirport)
+	queryBody := fmt.Sprintf(xmlGetFlightsTemplateBody, repo.AMSToken, from, to, repo.AMSAirport)
 	bodyReader := bytes.NewReader([]byte(queryBody))
 
 	req, err := http.NewRequest(http.MethodPost, repo.AMSSOAPServiceURL, bodyReader)
@@ -506,7 +524,7 @@ func getFlights(airportCode string, values ...int) []byte {
 	fmt.Printf("Got flights from %s to %s\n", from, to)
 	return resBody
 }
-func upadateAllocation(flight models.Flight, airportCode string) {
+func upadateAllocation(flight models.Flight, airportCode string, bypassDelete bool) {
 
 	//defer exeTime(fmt.Sprintf("Updated allocations for Flight %s", flight.GetFlightID()))()
 	// Testing with 3000 flights showed unmeasurable time to 500 micro seconds, so no worries mate
@@ -514,8 +532,9 @@ func upadateAllocation(flight models.Flight, airportCode string) {
 	repo := GetRepo(airportCode)
 
 	// It's too messy to do CRUD operations, so just delete all the allocations and then create them again from the current message
-	(*repo).RemoveFlightAllocation(flight.GetFlightID())
-
+	if !bypassDelete {
+		(*repo).RemoveFlightAllocation(flight.GetFlightID())
+	}
 	flightId := flight.GetFlightID()
 	direction := flight.GetFlightDirection()
 	route := flight.GetFlightRoute()

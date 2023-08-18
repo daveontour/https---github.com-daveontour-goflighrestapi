@@ -11,7 +11,6 @@ import (
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/repo"
 	"flightresourcerestapi/server"
-	"flightresourcerestapi/test"
 	"flightresourcerestapi/timeservice"
 
 	log "github.com/sirupsen/logrus"
@@ -23,6 +22,7 @@ import (
 
 func main() {
 
+	// Do a bit of initialisation
 	globals.InitGlobals()
 	timeservice.InitTimeService()
 
@@ -32,11 +32,14 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to determine if we are running in service: %v", err)
 	}
+
 	if inService {
+		// Running as a Windows service, so just go ahead and start it all
 		runService(svcName, false)
 		return
 	}
 
+	// Not in a service, so process the command line
 	cmd := ""
 	if len(os.Args) >= 2 {
 		cmd = strings.ToLower(os.Args[1])
@@ -45,13 +48,26 @@ func main() {
 	switch cmd {
 	case "debug":
 		globals.IsDebug = true
-		splash()
+		splash(0)
 		runService(svcName, true)
 		return
 	case "perftest":
 		globals.IsDebug = true
-		splash()
+		splash(1)
+		if len(os.Args) < 3 {
+			fmt.Println("You must specify the number of flights to include in the test")
+			return
+		}
 		perfTest(os.Args[2])
+		return
+	case "demo":
+		globals.IsDebug = true
+		splash(2)
+		if len(os.Args) < 3 {
+			fmt.Println("You must specify the number of flights to include in the demo")
+			return
+		}
+		demo(os.Args[2])
 		return
 	case "install":
 		err = installService(svcName, globals.ConfigViper.GetString("ServicDisplayName"), globals.ConfigViper.GetString("ServiceDescription"))
@@ -62,8 +78,10 @@ func main() {
 	case "stop":
 		err = controlService(svcName, svc.Stop, svc.Stopped)
 	default:
-		splash()
+		globals.IsDebug = true
+		splash(0)
 		runService(svcName, true)
+
 	}
 	if err != nil {
 		log.Fatalf("failed to %s %s: %v", cmd, svcName, err)
@@ -79,7 +97,7 @@ func usage(errmsg string) {
 		os.Args[0])
 }
 
-func splash() {
+func splash(mode int) {
 	fmt.Println()
 	fmt.Println("*******************************************************")
 	fmt.Println("*                                                     *")
@@ -98,8 +116,13 @@ func splash() {
 	fmt.Println("*  See adminhelp.html for configuration usage         *")
 	fmt.Println("*                                                     *")
 
-	if globals.ConfigViper.GetBool("PerfTestOnly") {
-		fmt.Println("*  WARNING! - Running in performance Test Mode        *")
+	if mode == 1 {
+		fmt.Println("*  WARNING! - Running in Performance Test Mode        *")
+		fmt.Println("*                                                     *")
+	}
+	if mode == 2 {
+		fmt.Println("*  WARNING! - Running in Demonstration Mode           *")
+		fmt.Println("*  Data is fictious and there is no AMS interation    *")
 		fmt.Println("*                                                     *")
 	}
 	fmt.Println("*******************************************************")
@@ -314,7 +337,32 @@ func perfTest(numFlightsSt string) {
 	globals.UserChangeSubscriptionsMutex.Unlock()
 
 	numFlights, _ := strconv.Atoi(numFlightsSt)
-	test.PerfTestInit(numFlights)
+	repo.PerfTestInit(numFlights)
+	globals.Wg.Wait()
+}
+
+func demo(numFlightsSt string) {
+
+	globals.DemoMode = true
+	globals.ConfigViper.Set("PerfTestOnly", true)
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	globals.Wg.Add(1)
+	go server.StartGinServer()
+	go eventMonitor()
+
+	// // Initiate the User Change Subscriptions
+	globals.UserChangeSubscriptionsMutex.Lock()
+	for _, up := range globals.GetUserProfiles() {
+		globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
+	}
+	globals.UserChangeSubscriptionsMutex.Unlock()
+
+	numFlights, err := strconv.Atoi(numFlightsSt)
+	if err != nil {
+		fmt.Println("Invalid number of flights entered on command line")
+		os.Exit(0)
+	}
+	repo.PerfTestInit(numFlights)
 	globals.Wg.Wait()
 }
 

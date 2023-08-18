@@ -141,6 +141,12 @@ func GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	if airline == "" && userProfile.DefaultAirline != "" {
 		airline = userProfile.DefaultAirline
 		response.AddWarning(fmt.Sprintf("Airline set to %s by the administration configuration", airline))
+	} else {
+		response.Airline = airline
+	}
+
+	if flt != "" {
+		response.Flight = flt
 	}
 
 	//Check that the user is allowed to access the requested airline
@@ -393,7 +399,7 @@ func prune(flights []models.Flight, request models.Request) (flDups []models.Fli
 
 	for _, flight := range flights {
 
-		//Go creates a copy with the below assignment
+		//Go creates a copy with the below assignment. The assignment cretaes a new copy of the struct, so the original is left untouched
 		flDup := flight
 
 		// Clear all the Custom Field Parameters

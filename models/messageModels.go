@@ -188,6 +188,7 @@ type UserChangeSubscription struct {
 	CreateFlight             bool
 	DeleteFlight             bool
 	UpdateFlight             bool
+	All                      bool
 	ParameterChange          []string
 }
 
@@ -436,6 +437,8 @@ type Response struct {
 	Route            string               `json:"Route,omitempty"`
 	From             string               `json:"FlightsFrom,omitempty"`
 	To               string               `json:"FlightsTo,omitempty"`
+	Airline          string               `json:"Airline,omitempty"`
+	Flight           string               `json:"Flight,omitempty"`
 	FromResource     string               `json:"ResourcessFrom,omitempty"`
 	ToResource       string               `json:"ResourceTo,omitempty"`
 	NumberOfFlights  int                  `json:"NumberOfFlights,omitempty"`

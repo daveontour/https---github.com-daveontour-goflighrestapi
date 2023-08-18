@@ -108,6 +108,10 @@ NextSub:
 		if !sub.UpdateFlight && flt.Action == globals.UpdateAction {
 			continue
 		}
+		if sub.All {
+			go executeChangePush(sub, flt)
+			continue NextSub
+		}
 		if sub.CreateFlight && flt.Action == globals.CreateAction {
 			go executeChangePush(sub, flt)
 			continue NextSub

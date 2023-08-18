@@ -738,21 +738,21 @@ type Envelope struct {
 	} `xml:"Body"`
 }
 
-type FlightCreatedNotificatioEnvelope struct {
+type FlightCreatedNotificationEnvelope struct {
 	Content struct {
 		FlightCreatedNotification struct {
 			Flight Flight `xml:"Flight"`
 		} `xml:"FlightCreatedNotification"`
 	} `xml:"Content"`
 }
-type FlightUpdatedNotificatioEnvelope struct {
+type FlightUpdatedNotificationEnvelope struct {
 	Content struct {
 		FlightUpdatedNotification struct {
 			Flight Flight `xml:"Flight"`
 		} `xml:"FlightUpdatedNotification"`
 	} `xml:"Content"`
 }
-type FlightDeletedNotificatioEnvelope struct {
+type FlightDeletedNotificationEnvelope struct {
 	Content struct {
 		FlightDeletedNotification struct {
 			Flight Flight `xml:"Flight"`

@@ -48,7 +48,9 @@ var RefreshSchedulerMap = make(map[string]*gocron.Scheduler)
 var UserChangeSubscriptions []models.UserChangeSubscription
 var UserChangeSubscriptionsMutex = &sync.RWMutex{}
 
-var ReservedParameters = []string{"airport", "airline", "al", "from", "to", "direction", "d", "route", "r", "sort"}
+var ReservedParameters = []string{"airport", "airline", "al", "from", "to", "direction", "d", "route", "r", "sort", "flt", "flight"}
+
+var DemoMode = false
 
 func InitGlobals() {
 

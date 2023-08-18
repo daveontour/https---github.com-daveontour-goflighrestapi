@@ -21,8 +21,8 @@
             ],
             "UserChangeSubscriptions": [
                 {
-                    "Enabled": false,
-                    "Airport": "AUH",
+                    "Enabled": true,
+                    "Airport": "APT",
                     "DestinationURL": "http://localhost:8081/test",
                     "HeaderParameters": [],
                     "CheckInChange": true,
@@ -37,7 +37,8 @@
                     ],
                     "CreateFlight": true,
                     "DeleteFlight": true,
-                    "UpdateFlight": true
+                    "UpdateFlight": true,
+                    "All":true
                 }
             ],
             "UserPushSubscriptions": [
