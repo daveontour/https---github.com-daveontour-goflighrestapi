@@ -17,7 +17,8 @@
                 "Il--_DisembarkingFirstPad",
                 "Sh--_GroundHandler",
                 "Il--_TotalMalePax",
-                "S---_Terminal"
+                "S---_Terminal",
+                "*"
             ],
             "UserChangeSubscriptions": [
                 {

@@ -392,7 +392,7 @@ type FlightState struct {
 	AircraftType  AircraftType  `xml:"AircraftType"`
 	Aircraft      Aircraft      `xml:"Aircraft" json:"Aircraft"`
 	Route         Route         `xml:"Route" json:"-"`
-	Value         []Value       `xml:"Value" json:"Values,omitempty"`
+	Values        []Value       `xml:"Value" json:"Values,omitempty"`
 	TableValue    []TableValue  `xml:"TableValue" json:"TableValues,omitempty"`
 	StandSlots    StandSlots    `xml:"StandSlots" json:"StandSlots,omitempty"`
 	CarouselSlots CarouselSlots `xml:"CarouselSlots" json:"CarouselSlots,omitempty"`
@@ -442,7 +442,7 @@ func (d FlightState) MarshalJSON() ([]byte, error) {
 	rt, _ := json.Marshal(d.Route)
 	sb.WriteString(fmt.Sprintf("\"Route\":%s,", string(rt)))
 
-	vs := MarshalJSON(d.Value)
+	vs := MarshalJSON(d.Values)
 	sb.WriteString(fmt.Sprintf("\"Values\":%s,", string(vs)))
 
 	ss, _ := json.Marshal(d.StandSlots)
@@ -767,7 +767,7 @@ func (f Flight) GetSDO() time.Time {
 	return sdod
 }
 func (f Flight) GetProperty(property string) string {
-	for _, v := range f.FlightState.Value {
+	for _, v := range f.FlightState.Values {
 		if v.PropertyName == property {
 			return v.Text
 		}
@@ -993,4 +993,31 @@ func (p GateSlot) GetResourceID() (name string, from time.Time, to time.Time) {
 		}
 	}
 	return name, from, to
+}
+
+func (r Repository) MinimumProperties(min int) {
+	if len(r.FlightLinkedList.Head.FlightState.Values) < min {
+
+		currentNode := r.FlightLinkedList.Head
+
+		for currentNode != nil {
+			i := len(currentNode.FlightState.Values)
+			for len(currentNode.FlightState.Values) <= min {
+				prop := Value{
+					PropertyName: fmt.Sprintf("Custom_Field_Name_%d", i),
+					Text:         fmt.Sprintf("Custom_Field_Value_%d", i),
+				}
+				currentNode.FlightState.Values = append(currentNode.FlightState.Values, prop)
+				i++
+			}
+			currentNode = currentNode.NextNode
+		}
+	} else if min < len(r.FlightLinkedList.Head.FlightState.Values) {
+		currentNode := r.FlightLinkedList.Head
+
+		for currentNode != nil {
+			currentNode.FlightState.Values = currentNode.FlightState.Values[:min]
+			currentNode = currentNode.NextNode
+		}
+	}
 }

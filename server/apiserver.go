@@ -98,16 +98,16 @@ func StartGinServer() {
 		}
 	})
 
-	router.GET("/admin/perftestinit/:num", func(c *gin.Context) {
-		if hasAdminToken(c) {
-			num := c.Param("num")
-			nf, _ := strconv.Atoi(num)
-			repo.PerfTestInit(nf)
-			c.JSON(http.StatusOK, gin.H{"PerformanceTest": fmt.Sprintf("Done")})
-		} else {
-			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
-		}
-	})
+	// router.GET("/admin/perftestinit/:num", func(c *gin.Context) {
+	// 	if hasAdminToken(c) {
+	// 		num := c.Param("num")
+	// 		nf, _ := strconv.Atoi(num)
+	// 		repo.PerfTestInit(nf)
+	// 		c.JSON(http.StatusOK, gin.H{"PerformanceTest": fmt.Sprintf("Done")})
+	// 	} else {
+	// 		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+	// 	}
+	// })
 
 	// router.GET("/memTest", func(c *gin.Context) {
 	// 	i := 0

@@ -403,7 +403,7 @@ func prune(flights []models.Flight, request models.Request) (flDups []models.Fli
 		flDup := flight
 
 		// Clear all the Custom Field Parameters
-		flDup.FlightState.Value = []models.Value{}
+		flDup.FlightState.Values = []models.Value{}
 
 		// If Allowed CustomFields is not nil, then filter the custome fields
 		// if "*" in list then it is all custom fields
@@ -411,13 +411,13 @@ func prune(flights []models.Flight, request models.Request) (flDups []models.Fli
 
 		if request.UserProfile.AllowedCustomFields != nil {
 			if globals.Contains(request.UserProfile.AllowedCustomFields, "*") {
-				flDup.FlightState.Value = flight.FlightState.Value
+				flDup.FlightState.Values = flight.FlightState.Values
 			} else {
 				for _, property := range request.UserProfile.AllowedCustomFields {
 					data := flight.GetProperty(property)
 
 					if data != "" {
-						flDup.FlightState.Value = append(flDup.FlightState.Value, models.Value{PropertyName: property, Text: data})
+						flDup.FlightState.Values = append(flDup.FlightState.Values, models.Value{PropertyName: property, Text: data})
 					}
 				}
 			}

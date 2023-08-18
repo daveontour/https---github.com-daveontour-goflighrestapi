@@ -11,7 +11,7 @@
     "UseHTTPSUntrusted": false,
     "KeyFile": "keyFile",
     "CertFile": "certFile",
-    "TestHTTPServer": true,
+    "TestHTTPServer": false,
     "LogFile": "c:/Users/dave_/Desktop/Logs/process.log",
     "RequestLogFile": "c:/Users/dave_/Desktop/Logs/request.log",
     "MaxLogFileSizeInMB": 50,
