@@ -7,7 +7,7 @@
         <FlightId xmlns="http://www.sita.aero/ams6-xml-api-datatypes">
           <FlightKind>Departure</FlightKind>
           <AirlineDesignator codeContext="IATA">%s</AirlineDesignator>
-          <FlightNumber>%d</FlightNumber>
+          <FlightNumber>%s</FlightNumber>
           <ScheduledDate>%s</ScheduledDate>
           <AirportCode codeContext="IATA">%s</AirportCode>
         </FlightId>
@@ -17,7 +17,7 @@
 		  <FlightId>
 			<FlightKind>Arrival</FlightKind>
 			<AirlineDesignator codeContext="IATA">%s</AirlineDesignator>
-			<FlightNumber>%d</FlightNumber>
+			<FlightNumber>%s</FlightNumber>
 			<ScheduledDate>%s</ScheduledDate>
 			<AirportCode codeContext="IATA">%s</AirportCode>
 		  </FlightId>

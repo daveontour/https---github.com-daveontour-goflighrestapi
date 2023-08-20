@@ -23,8 +23,9 @@
             "UserChangeSubscriptions": [
                 {
                     "Enabled": true,
+                    "EnableInDemoMode":true,
                     "Airport": "APT",
-                    "DestinationURL": "http://localhost:8081/test",
+                    "DestinationURL": "http://localhost:8082/changeEndpoint",
                     "HeaderParameters": [],
                     "CheckInChange": true,
                     "GateChange": true,
@@ -39,47 +40,31 @@
                     "CreateFlight": true,
                     "DeleteFlight": true,
                     "UpdateFlight": true,
-                    "All":true
+                    "All":true,
+                    "TrustBadCertificates":true
                 }
             ],
             "UserPushSubscriptions": [
                 {
-                    "Enabled": false,
+                    "Enabled": true,
+                    "EnableInDemoMode":true,
                     "PushOnStartUp": true,
-                    "Airport": "AUH",
-                    "DestinationURL": "http://localhost:8081/test",
+                    "Airport": "APT",
+                    "DestinationURL": "http://localhost:8082/subscriptionEndPoint",
                     "HeaderParameters": "",
                     "SubscriptionType": "Flight",
                     "Time": "14:00:00",
                     "ReptitionHours": 1,
-                    "ReptitionMinutes": 2,
+                    "ReptitionMinutes": 1,
                     "Airline": "",
-                    "From": 0,
+                    "From": -24,
                     "To": 24,
                     "QueryableCustomFields": [],
                     "ResourceType": "",
                     "ResourceID": "",
                     "Route": "",
-                    "Direction": ""
-                },
-                {
-                    "Enabled": false,
-                    "PushOnStartUp": true,
-                    "Airport": "AUH",
-                    "DestinationURL": "http://localhost:8081/test",
-                    "HeaderParameters": "",
-                    "SubscriptionType": "Resource",
-                    "Time": "14:00:00",
-                    "ReptitionHours": 1,
-                    "ReptitionMinutes": 0,
-                    "Airline": "",
-                    "From": 0,
-                    "To": 24,
-                    "QueryableCustomFields": [],
-                    "ResourceType": "Stand",
-                    "ResourceID": "",
-                    "Route": "",
-                    "Direction": ""
+                    "Direction": "",
+                    "TrustBadCertificates":true
                 }
             ]
         },

@@ -121,8 +121,6 @@ func GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	response.User = userProfile.UserName
 
 	if apt == "" {
-		//apt = userProfile.DefaultAirport
-
 		return response, models.GetFlightsError{
 			StatusCode: http.StatusBadRequest,
 			Err:        errors.New("Airport not specified"),
@@ -149,7 +147,7 @@ func GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 		response.Flight = flt
 	}
 
-	//Check that the user is allowed to access the requested airline
+	//Check that the user is allowed to access the requested airport
 	if !globals.Contains(userProfile.AllowedAirports, apt) &&
 		!globals.Contains(userProfile.AllowedAirports, "*") {
 		return response, models.GetFlightsError{
@@ -182,7 +180,7 @@ func GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, us
 	// Get the filtered and pruned flights for the request
 	globals.MapMutex.Lock()
 	flights := GetRepo(apt).FlightLinkedList
-	response, err = filterFlights(request, response, flights, c)
+	response, err = filterFlights(request, response, flights, c, GetRepo(apt))
 	globals.MapMutex.Unlock()
 
 	if err == nil {
@@ -254,7 +252,7 @@ func processCustomFieldQueries(request models.Request, response models.Response,
 
 	return request, response
 }
-func filterFlights(request models.Request, response models.Response, flightsLinkedList models.FlightLinkedList, c *gin.Context) (models.Response, error) {
+func filterFlights(request models.Request, response models.Response, flightsLinkedList models.FlightLinkedList, c *gin.Context, repo *models.Repository) (models.Response, error) {
 
 	//defer exeTime("Filter, Prune and Sort Flights")()
 	returnFlights := []models.Flight{}
@@ -269,6 +267,11 @@ func filterFlights(request models.Request, response models.Response, flightsLink
 	}
 
 	from := time.Now().Add(time.Hour * time.Duration(fromOffset))
+
+	if from.Before(repo.CurrentLowerLimit) {
+		from = repo.CurrentLowerLimit
+		response.AddWarning(fmt.Sprintf("Requested lower time limit outside cache boundaries. Set to %s", from.Format("2006-01-02T15:04:05")))
+	}
 	response.From = from.Format("2006-01-02T15:04:05")
 
 	toOffset, toErr := strconv.Atoi(request.To)
@@ -277,6 +280,11 @@ func filterFlights(request models.Request, response models.Response, flightsLink
 	}
 
 	to := time.Now().Add(time.Hour * time.Duration(toOffset))
+	if to.After(repo.CurrentUpperLimit) {
+		to = repo.CurrentUpperLimit
+		response.AddWarning(fmt.Sprintf("Requested upper time limit outside cache boundaries. Set to %s", to.Format("2006-01-02T15:04:05")))
+	}
+
 	response.To = to.Format("2006-01-02T15:04:05")
 
 	if request.UpdatedSince != "" {

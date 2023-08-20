@@ -4,15 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
 
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/repo"
-	"flightresourcerestapi/server"
-	"flightresourcerestapi/timeservice"
 	"flightresourcerestapi/version"
 
 	"github.com/spf13/cobra"
@@ -20,18 +17,7 @@ import (
 	"golang.org/x/sys/windows/svc/debug"
 )
 
-func ExecuteCobra() {
-	err := rootCmd.Execute()
-	if err != nil {
-		os.Exit(1)
-	}
-}
-
 func InitCobra() {
-
-	// Do a bit of initialisation
-	globals.InitGlobals()
-	timeservice.InitTimeService()
 
 	rootCmd.CompletionOptions.DisableDefaultCmd = true
 	rootCmd.Version = version.Version
@@ -44,6 +30,12 @@ func InitCobra() {
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(stopCmd)
+}
+func ExecuteCobra() {
+	err := rootCmd.Execute()
+	if err != nil {
+		os.Exit(1)
+	}
 }
 
 var rootCmd = &cobra.Command{
@@ -164,91 +156,7 @@ func RunService(name string, isDebug bool) {
 	}
 	globals.Logger.Info(fmt.Sprintf("%s service stopped", name))
 }
-func runProgram() {
 
-	numCPU := runtime.NumCPU()
-
-	globals.Logger.Debug(fmt.Sprintf("Number of cores available = %v", numCPU))
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	//Wait group so the program doesn't exit
-	globals.Wg.Add(1)
-
-	// The HTTP Server
-	go server.StartGinServer()
-
-	// Handler for the different types of messages passed by channels
-	go eventMonitor()
-
-	// Manages the population and update of the repositoiry of flights
-	go repo.InitRepositories()
-
-	// Initiate the User Change Subscriptions
-	globals.UserChangeSubscriptionsMutex.Lock()
-	for _, up := range globals.GetUserProfiles() {
-		globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
-	}
-	globals.UserChangeSubscriptionsMutex.Unlock()
-	globals.Wg.Wait()
-}
-func perfTest(numFlightsSt string, minCustomPropertiesSt string) {
-
-	// Start the system in performance test mode. Resources and flights are created as per test.json
-	// Requires Rabbit MQ to be running. Messages are passsed via Rabbit MQ
-	numCPU := runtime.NumCPU()
-
-	globals.Logger.Debug(fmt.Sprintf("Number of cores available = %v", numCPU))
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	//Wait group so the program doesn't exit
-	globals.Wg.Add(1)
-
-	// The HTTP Server
-	go server.StartGinServer()
-
-	// Handler for the different types of messages passed by channels
-	go eventMonitor()
-
-	// Initiate the User Change Subscriptions
-	globals.UserChangeSubscriptionsMutex.Lock()
-	for _, up := range globals.GetUserProfiles() {
-		globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
-	}
-	globals.UserChangeSubscriptionsMutex.Unlock()
-
-	numFlights, _ := strconv.Atoi(numFlightsSt)
-	minProps, _ := strconv.Atoi(minCustomPropertiesSt)
-	repo.PerfTestInit(numFlights, minProps)
-	globals.Wg.Wait()
-}
-func demo(numFlightsSt string, minCustomPropertiesSt string) {
-
-	// Start the system in demo mode. Resources and flights are created as per test.json
-	// Does not require Rabbit MQ to be running.
-	globals.DemoMode = true
-
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	globals.Wg.Add(1)
-	go server.StartGinServer()
-	go eventMonitor()
-
-	// // Initiate the User Change Subscriptions
-	globals.UserChangeSubscriptionsMutex.Lock()
-	for _, up := range globals.GetUserProfiles() {
-		globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
-	}
-	globals.UserChangeSubscriptionsMutex.Unlock()
-
-	numFlights, err := strconv.Atoi(numFlightsSt)
-	if err != nil {
-		fmt.Println("Invalid number of flights entered on command line")
-		os.Exit(0)
-	}
-	minProps, _ := strconv.Atoi(minCustomPropertiesSt)
-	repo.PerfTestInit(numFlights, minProps)
-
-	globals.Wg.Wait()
-}
 func eventMonitor() {
 
 	//Acts as an exchange between events and action to be taken on those events

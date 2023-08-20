@@ -18,5 +18,7 @@
     "MaxNumberLogFiles": 3,
     "EnableMetrics": true,
     "MetricsLogFile": "c:/Users/dave_/Desktop/Logs/performance.log",
-    "AdminToken": "davewashere"
+    "AdminToken": "davewashere",
+    "NumberOfChangePushWorkers":7,
+    "NumberOfSchedulePushWorkers":5
 }

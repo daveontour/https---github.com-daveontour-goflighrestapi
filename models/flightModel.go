@@ -996,6 +996,8 @@ func (p GateSlot) GetResourceID() (name string, from time.Time, to time.Time) {
 }
 
 func (r Repository) MinimumProperties(min int) {
+
+	fmt.Printf("Setting the number of Custom Fields in sample flights to %v", min)
 	if len(r.FlightLinkedList.Head.FlightState.Values) < min {
 
 		currentNode := r.FlightLinkedList.Head
@@ -1020,4 +1022,7 @@ func (r Repository) MinimumProperties(min int) {
 			currentNode = currentNode.NextNode
 		}
 	}
+
+	fmt.Printf(" - Completed\n")
+
 }

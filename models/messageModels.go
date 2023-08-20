@@ -155,6 +155,7 @@ type UserProfile struct {
 
 type UserPushSubscription struct {
 	Enabled               bool
+	EnableInDemoMode      bool
 	PushOnStartUp         bool
 	Airport               string
 	DestinationURL        string
@@ -171,6 +172,7 @@ type UserPushSubscription struct {
 	ResourceID            string
 	Route                 string
 	Direction             string
+	TrustBadCertificates  bool
 }
 
 type UserChangeSubscription struct {
@@ -190,6 +192,7 @@ type UserChangeSubscription struct {
 	UpdateFlight             bool
 	All                      bool
 	ParameterChange          []string
+	TrustBadCertificates     bool
 }
 
 type Users struct {
@@ -538,4 +541,14 @@ type GetFlightsError struct {
 
 func (r *GetFlightsError) Error() string {
 	return fmt.Sprintf("status %d: err %v", r.StatusCode, r.Err)
+}
+
+type ChangePushJob struct {
+	Sub    UserChangeSubscription
+	Flight Flight
+}
+type SchedulePushJob struct {
+	Sub       UserPushSubscription
+	UserToken string
+	UserName  string
 }
