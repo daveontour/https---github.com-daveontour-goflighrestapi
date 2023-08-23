@@ -163,20 +163,20 @@ func eventMonitor() {
 
 	for {
 		select {
-		case flight := <-globals.FlightUpdatedChannel:
+		case flightChanMesage := <-globals.FlightUpdatedChannel:
 
-			globals.Logger.Trace(fmt.Sprintf("FlightUpdated: %s", flight.GetFlightID()))
-			go repo.HandleFlightUpdate(flight)
+			globals.Logger.Trace(fmt.Sprintf("FlightUpdated: %s", flightChanMesage.FlightID))
+			go repo.HandleFlightUpdate(flightChanMesage)
 
 		case flight := <-globals.FlightDeletedChannel:
 
 			globals.Logger.Trace(fmt.Sprintf("FlightDeleted: %s", flight.GetFlightID()))
 			go repo.HandleFlightDelete(flight)
 
-		case flight := <-globals.FlightCreatedChannel:
+		case flightChanMesage := <-globals.FlightUpdatedChannel:
 
-			globals.Logger.Trace(fmt.Sprintf("FlightCreated: %s", flight.GetFlightID()))
-			go repo.HandleFlightCreate(flight)
+			globals.Logger.Trace(fmt.Sprintf("FlightCreated: %s", flightChanMesage.FlightID))
+			go repo.HandleFlightCreate(flightChanMesage)
 
 		case numflight := <-globals.FlightsInitChannel:
 			globals.Logger.Trace(fmt.Sprintf("Flight Initialised or Refreshed: %v", numflight))

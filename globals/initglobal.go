@@ -1,6 +1,7 @@
 package globals
 
 import (
+	"flightresourcerestapi/models"
 	"os"
 	"path/filepath"
 	"sync"
@@ -11,8 +12,6 @@ import (
 	"github.com/spf13/viper"
 	easy "github.com/t-tomalak/logrus-easy-formatter"
 	"gopkg.in/natefinch/lumberjack.v2"
-
-	"flightresourcerestapi/models"
 )
 
 var RepoList []models.Repository
@@ -37,8 +36,8 @@ const DeleteAction = "DELETE"
 const StatusAction = "STATUS"
 
 var RepositoryUpdateChannel = make(chan int)
-var FlightUpdatedChannel = make(chan models.Flight)
-var FlightCreatedChannel = make(chan models.Flight)
+var FlightUpdatedChannel = make(chan models.FlightUpdateChannelMessage)
+var FlightCreatedChannel = make(chan models.FlightUpdateChannelMessage)
 var FlightDeletedChannel = make(chan models.Flight)
 var FlightsInitChannel = make(chan int)
 

@@ -32,7 +32,9 @@ func perfTest(numFlightsSt string, minCustomPropertiesSt string) {
 	// Initiate the User Change Subscriptions
 	globals.UserChangeSubscriptionsMutex.Lock()
 	for _, up := range globals.GetUserProfiles() {
-		globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
+		if up.Enabled {
+			globals.UserChangeSubscriptions = append(globals.UserChangeSubscriptions, up.UserChangeSubscriptions...)
+		}
 	}
 	globals.UserChangeSubscriptionsMutex.Unlock()
 

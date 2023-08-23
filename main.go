@@ -4,6 +4,9 @@ import (
 	"flightresourcerestapi/cmd"
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/timeservice"
+	"net/http"
+
+	_ "net/http/pprof"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sys/windows/svc"
@@ -26,6 +29,9 @@ func main() {
 		return
 	}
 
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
 	//Sets up the CLI
 	cmd.InitCobra()
 

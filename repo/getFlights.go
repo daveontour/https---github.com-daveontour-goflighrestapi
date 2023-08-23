@@ -1,9 +1,11 @@
 package repo
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -74,15 +76,75 @@ func GetRequestedFlightsAPI(c *gin.Context) {
 		route = c.Query("r")
 	}
 
-	response, error := GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, "", c, nil)
-	c.Writer.Header().Set("Content-Type", "application/json")
+	response, _ := GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, "", c, nil)
 
-	if error.Err == nil {
-		c.JSON(http.StatusOK, response)
-	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", error.Err.Error())})
+	file, errs := os.CreateTemp("", "getflighttemp-*.txt")
+	if errs != nil {
+		fmt.Println(errs)
+		return
 	}
+	fwb := bufio.NewWriterSize(file, 20000)
+	defer os.Remove(file.Name())
 
+	fmt.Println("The temporary file is created:", file.Name())
+	fwb.WriteByte('{')
+	fwb.WriteString(fmt.Sprintf("\"Airport\":\"%s\",", response.AirportCode))
+	fwb.WriteString(fmt.Sprintf("\"Direction\":\"%s\",", response.Direction))
+	fwb.WriteString(fmt.Sprintf("\"ScheduleFlightsFrom\":\"%s\",", response.From))
+	fwb.WriteString(fmt.Sprintf("\"ScheduleFlightsTo\":\"%s\",", response.To))
+	fwb.WriteString(fmt.Sprintf("\"NumberOfFlights\":\"%v\",", response.NumberOfFlights))
+	if response.Airline != "" {
+		fwb.WriteString(fmt.Sprintf("\"Airline\":\"%s\",", response.Airline))
+	} else {
+		fwb.WriteString("\"Airline\":\"*\",")
+	}
+	if response.Flight != "" {
+		fwb.WriteString(fmt.Sprintf("\"Flight\":\"%s\",", response.Flight))
+	} else {
+		fwb.WriteString("\"Flight\":\"*\",")
+	}
+	if response.Route != "" {
+		fwb.WriteString(fmt.Sprintf("\"Route\":\"%s\",", response.Route))
+	} else {
+		fwb.WriteString("\"Route\":\"*\",")
+	}
+	fwb.WriteString("\"CustomFieldQuery\":[")
+	for idx, w := range response.CustomFieldQuery {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString(fmt.Sprintf("{\"%s\":\"%s\"}", w.Parameter, w.Value))
+	}
+	fwb.WriteString("],")
+
+	fwb.WriteString("\"Warnings\":[")
+	for idx, w := range response.Warnings {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString(fmt.Sprintf("\"%s\"", w))
+	}
+	fwb.WriteString("],")
+
+	fwb.WriteString("\"Errors\":[")
+	for idx, w := range response.Errors {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString(fmt.Sprintf("\"%s\"", w))
+	}
+	fwb.WriteString("],")
+
+	error := models.WriteFlightsInJSON(fwb, response.ResponseFlights, &userProfile)
+	error2 := fwb.WriteByte('}')
+	error3 := fwb.Flush()
+
+	if error == nil && error2 == nil && error3 == nil {
+		c.Writer.Header().Set("Content-Type", "application/json")
+		c.File(file.Name())
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", error.Error())})
+	}
 }
 
 func GetRequestedFlightsSub(sub models.UserPushSubscription, userToken string) (models.Response, models.GetFlightsError) {
@@ -255,7 +317,7 @@ func processCustomFieldQueries(request models.Request, response models.Response,
 func filterFlights(request models.Request, response models.Response, flightsLinkedList models.FlightLinkedList, c *gin.Context, repo *models.Repository) (models.Response, error) {
 
 	//defer exeTime("Filter, Prune and Sort Flights")()
-	returnFlights := []models.Flight{}
+	//returnFlights := []models.Flight{}
 
 	// var from time.Time
 	// var to time.Time
@@ -376,75 +438,76 @@ NextFlight:
 			}
 		}
 
-		// Made it here without being filtered out, so add it to the flights to be returned. The "prune"
-		// function removed any message elements that the user is not allowed to see
+		// Made it here without being filtered out, so add it to the flights to be returned.
 		currentFlight.Action = globals.StatusAction
-		returnFlights = append(returnFlights, *currentFlight)
+		//	response.ResponseFlights.AddNode(models.FlightResponseItem{FlightPtr: currentFlight})
+		response.ResponseFlights = append(response.ResponseFlights, models.FlightResponseItem{FlightPtr: currentFlight, STO: currentFlight.GetSTO()})
+
 		currentFlight = currentFlight.NextNode
 	}
 
 	globals.MetricsLogger.Info(fmt.Sprintf("Filter Flights execution time: %s", time.Since(filterStart)))
 
-	returnFlights = prune(returnFlights, request)
+	//***Important
+	//Pruning is now done at the output to avoid creating additional copies of the data structure
 
-	response.NumberOfFlights = len(returnFlights)
+	response.NumberOfFlights = len(response.ResponseFlights)
 
 	defer globals.ExeTime(fmt.Sprintf("Sorting %v Filtered Flights", response.NumberOfFlights))()
-	sort.Slice(returnFlights, func(i, j int) bool {
-		return returnFlights[i].GetSTO().Before(returnFlights[j].GetSTO())
+	sort.Slice(response.ResponseFlights, func(i, j int) bool {
+		return response.ResponseFlights[i].STO.Before(response.ResponseFlights[j].STO)
 	})
 
-	response.Flights = returnFlights
 	response.CustomFieldQuery = request.PresentQueryableParameters
 
 	return response, nil
 }
 
 // Creates a copy of the flight record with the custom fields that the user is allowed to see
-func prune(flights []models.Flight, request models.Request) (flDups []models.Flight) {
+// func prune(flights []models.Flight, request models.Request) (flDups []models.Flight) {
 
-	defer globals.ExeTime(fmt.Sprintf("Pruning %v Filtered Flights", len(flights)))()
+// 	defer globals.ExeTime(fmt.Sprintf("Pruning %v Filtered Flights", len(flights)))()
 
-	for _, flight := range flights {
+// 	for _, flight := range flights {
 
-		//Go creates a copy with the below assignment. The assignment cretaes a new copy of the struct, so the original is left untouched
-		flDup := flight
+// 		//Go creates a copy with the below assignment. The assignment cretaes a new copy of the struct, so the original is left untouched
+// 		flDup := flight
 
-		// Clear all the Custom Field Parameters
-		flDup.FlightState.Values = []models.Value{}
+// 		// Clear all the Custom Field Parameters
+// 		flDup.FlightState.Values = []models.Value{}
 
-		// If Allowed CustomFields is not nil, then filter the custome fields
-		// if "*" in list then it is all custom fields
-		// Extra safety, if the parameter is not defined, then no results returned
+// 		// If Allowed CustomFields is not nil, then filter the custome fields
+// 		// if "*" in list then it is all custom fields
+// 		// Extra safety, if the parameter is not defined, then no results returned
 
-		if request.UserProfile.AllowedCustomFields != nil {
-			if globals.Contains(request.UserProfile.AllowedCustomFields, "*") {
-				flDup.FlightState.Values = flight.FlightState.Values
-			} else {
-				for _, property := range request.UserProfile.AllowedCustomFields {
-					data := flight.GetProperty(property)
+// 		if request.UserProfile.AllowedCustomFields != nil {
+// 			if globals.Contains(request.UserProfile.AllowedCustomFields, "*") {
+// 				flDup.FlightState.Values = flight.FlightState.Values
+// 			} else {
+// 				for _, property := range request.UserProfile.AllowedCustomFields {
+// 					data := flight.GetProperty(property)
 
-					if data != "" {
-						flDup.FlightState.Values = append(flDup.FlightState.Values, models.Value{PropertyName: property, Text: data})
-					}
-				}
-			}
-		}
+// 					if data != "" {
+// 						flDup.FlightState.Values = append(flDup.FlightState.Values, models.Value{PropertyName: property, Text: data})
+// 					}
+// 				}
+// 			}
+// 		}
 
-		changes := []models.Change{}
+// 		changes := []models.Change{}
 
-		for ii := 0; ii < len(flDup.FlightChanges.Changes); ii++ {
-			ok := globals.Contains(request.UserProfile.AllowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
-			ok = ok || request.UserProfile.AllowedCustomFields == nil
-			if ok {
-				changes = append(changes, flDup.FlightChanges.Changes[ii])
-			}
-		}
+// 		for ii := 0; ii < len(flDup.FlightChanges.Changes); ii++ {
+// 			ok := globals.Contains(request.UserProfile.AllowedCustomFields, flDup.FlightChanges.Changes[ii].PropertyName)
+// 			ok = ok || request.UserProfile.AllowedCustomFields == nil
+// 			if ok {
+// 				changes = append(changes, flDup.FlightChanges.Changes[ii])
+// 			}
+// 		}
 
-		flDup.FlightChanges.Changes = changes
+// 		flDup.FlightChanges.Changes = changes
 
-		flDups = append(flDups, flDup)
-	}
+// 		flDups = append(flDups, flDup)
+// 	}
 
-	return
-}
+// 	return
+// }

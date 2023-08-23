@@ -1,6 +1,7 @@
 package models
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -14,6 +15,11 @@ type FixedResource struct {
 }
 type FixedResources struct {
 	Values []FixedResource `xml:"FixedResource"`
+}
+
+type FlightUpdateChannelMessage struct {
+	FlightID    string
+	AirportCode string
 }
 
 type AllocationItem struct {
@@ -265,10 +271,115 @@ func (ll *ResourceLinkedList) NumberOfFlightAllocations() (n int) {
 	return
 }
 
+type FlightResponseItem struct {
+	// NextNode  *FlightResponseItem
+	// PrevNode  *FlightResponseItem
+	FlightPtr *Flight
+	STO       time.Time
+}
+
+// type FlightResponseLinkedList struct {
+// 	Head *FlightResponseItem
+// 	Tail *FlightResponseItem
+// }
+
+// func (ll *FlightResponseLinkedList) Sort() {
+// 	currentNode := ll.Head
+// 	if currentNode == nil {
+// 		return
+// 	}
+// 	for currentNode != nil {
+// 		indexNode := currentNode.NextNode
+// 		for indexNode != nil {
+// 			if currentNode.FlightPtr.GetSTO().After(indexNode.FlightPtr.GetSTO()) {
+// 				temp := currentNode.FlightPtr
+// 				currentNode.FlightPtr = indexNode.FlightPtr
+// 				indexNode.FlightPtr = temp
+// 			}
+// 			indexNode = indexNode.NextNode
+// 		}
+// 		currentNode = currentNode.NextNode
+// 	}
+// }
+
+// func (ll *FlightResponseLinkedList) AddNode(newNode FlightResponseItem) {
+
+// 	newNode.PrevNode = ll.Tail
+// 	newNode.NextNode = nil
+
+// 	if ll.Tail != nil {
+// 		ll.Tail.NextNode = &newNode
+// 	}
+
+// 	ll.Tail = &newNode
+
+// 	if ll.Head == nil {
+// 		ll.Head = &newNode
+// 	}
+// }
+
+// func (ll *FlightResponseLinkedList) Len() (count int) {
+
+// 	if ll.Head == nil {
+// 		count = 0
+// 		return
+// 	}
+
+// 	currentNode := ll.Head
+// 	count = 1
+// 	for currentNode != nil {
+// 		currentNode = currentNode.NextNode
+// 		count++
+// 	}
+
+// 	return
+
+// }
+
 // FlightLinkedList represents the doubly linked list.
 type FlightLinkedList struct {
 	Head *Flight
 	Tail *Flight
+}
+
+// func (r FlightResponseLinkedList) WriteJSON(fwb *bufio.Writer) error {
+
+// 	//var sb strings.Builder
+
+// 	fwb.WriteString(`"Flights":[`)
+
+// 	currentNode := r.Head
+
+// 	idx := 0
+// 	for currentNode != nil {
+// 		if idx > 0 {
+// 			fwb.WriteByte(',')
+// 		}
+// 		(currentNode.FlightPtr).WriteJSON(fwb)
+// 		//fwb.Write(fs)
+// 		currentNode = currentNode.NextNode
+// 		idx++
+// 	}
+
+// 	fwb.WriteByte(']')
+
+// 	return nil
+
+// 	//return []byte(sb.String()), nil
+// }
+
+func WriteFlightsInJSON(fwb *bufio.Writer, flights []FlightResponseItem, userProfile *UserProfile) error {
+	fwb.WriteString(`"Flights":[`)
+
+	for idx, currentNode := range flights {
+		if idx > 0 {
+			fwb.WriteByte(',')
+		}
+		(currentNode.FlightPtr).WriteJSON(fwb, userProfile)
+	}
+
+	fwb.WriteByte(']')
+	return nil
 }
 
 func (ll *FlightLinkedList) RemoveNode(removeNode Flight) {
@@ -297,6 +408,24 @@ func (ll *FlightLinkedList) RemoveNode(removeNode Flight) {
 		currentNode = currentNode.NextNode
 	}
 }
+
+func (ll *FlightLinkedList) GetFlight(flightID string) *Flight {
+	currentNode := ll.Head
+
+	for currentNode != nil {
+		if currentNode.GetFlightID() == flightID {
+			return currentNode
+		}
+
+		currentNode = currentNode.NextNode
+	}
+	return nil
+}
+
+func (rep *Repository) GetFlight(flightID string) *Flight {
+	return rep.FlightLinkedList.GetFlight(flightID)
+}
+
 func (ll *FlightLinkedList) Len() int {
 	currentNode := ll.Head
 	count := 0
@@ -449,7 +578,11 @@ type Response struct {
 	CustomFieldQuery []ParameterValuePair `json:"CustomFieldQueries,omitempty"`
 	Warnings         []string             `json:"Warnings,omitempty"`
 	Errors           []string             `json:"Errors,omitempty"`
-	Flights          []Flight             `json:"Flights,omitempty"`
+	//	Flights          []Flight                 `json:"Flights,omitempty"`
+	//Flights         []Flight                 `json:"-"`
+	ResponseFlights []FlightResponseItem `json:"Flights,omitempty"`
+	//ResponseFlights FlightResponseLinkedList `json:"Flights,omitempty"`
+	//ResponseFlights FlightResponseLinkedList `json:"-"`
 }
 
 type ResourceResponse struct {
@@ -545,7 +678,7 @@ func (r *GetFlightsError) Error() string {
 
 type ChangePushJob struct {
 	Sub    UserChangeSubscription
-	Flight Flight
+	Flight *Flight
 }
 type SchedulePushJob struct {
 	Sub       UserPushSubscription

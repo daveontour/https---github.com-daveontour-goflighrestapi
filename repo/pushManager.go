@@ -3,12 +3,15 @@ package repo
 import (
 	"bytes"
 	"crypto/tls"
+
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
+
+	//"github.com/goccy/go-json"
 
 	"github.com/go-co-op/gocron"
 
@@ -56,6 +59,10 @@ func SchedulePushes(airportCode string, demoMode bool) {
 
 	for _, u := range globals.GetUserProfiles() {
 
+		if !u.Enabled {
+			continue
+		}
+
 		for _, sub := range u.UserPushSubscriptions {
 			if sub.Airport != airportCode || !sub.Enabled || (demoMode && !sub.EnableInDemoMode) {
 				continue
@@ -85,24 +92,25 @@ func SchedulePushes(airportCode string, demoMode bool) {
 	s.StartBlocking()
 }
 
-func HandleFlightUpdate(flt models.Flight) {
-	checkForImpactedSubscription(flt)
+func HandleFlightUpdate(mess models.FlightUpdateChannelMessage) {
+	checkForImpactedSubscription(mess)
 	return
 }
 
-func HandleFlightCreate(flt models.Flight) {
-	checkForImpactedSubscription(flt)
+func HandleFlightCreate(mess models.FlightUpdateChannelMessage) {
+	checkForImpactedSubscription(mess)
 	return
 }
 
 func HandleFlightDelete(flt models.Flight) {
-	checkForImpactedSubscription(flt)
+	checkForImpactedDeleteSubscription(flt)
 	return
 }
 
 // Check if any of the registered change subscriptions are interested in this change
-func checkForImpactedSubscription(flt models.Flight) {
+func checkForImpactedSubscription(mess models.FlightUpdateChannelMessage) {
 
+	flt := GetRepo(mess.AirportCode).GetFlight(mess.FlightID)
 	sto := flt.GetSTO()
 
 	if sto.Local().After(time.Now().Local().Add(36 * time.Hour)) {
@@ -118,38 +126,38 @@ NextSub:
 		if !sub.Enabled {
 			continue
 		}
-		if sub.Airport != flt.GetIATAAirport() {
+		if sub.Airport != (*flt).GetIATAAirport() {
 			continue
 		}
 
-		if !sub.UpdateFlight && flt.Action == globals.UpdateAction {
+		if !sub.UpdateFlight && (*flt).Action == globals.UpdateAction {
 			continue
 		}
 		if sub.All {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue NextSub
 		}
-		if sub.CreateFlight && flt.Action == globals.CreateAction {
+		if sub.CreateFlight && (*flt).Action == globals.CreateAction {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue NextSub
 		}
-		if !sub.DeleteFlight && flt.Action == globals.DeleteAction {
+		if !sub.DeleteFlight && (*flt).Action == globals.DeleteAction {
 			continue
 		}
 
-		if sub.DeleteFlight && flt.Action == globals.DeleteAction {
+		if sub.DeleteFlight && (*flt).Action == globals.DeleteAction {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue NextSub
 		}
-		if sub.CreateFlight && flt.Action == globals.CreateAction {
+		if sub.CreateFlight && (*flt).Action == globals.CreateAction {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue NextSub
 		}
-		if !sub.UpdateFlight && flt.Action == globals.UpdateAction {
+		if !sub.UpdateFlight && (*flt).Action == globals.UpdateAction {
 			continue
 		}
 		// Required Parameter Field Changes
-		for _, change := range flt.FlightChanges.Changes {
+		for _, change := range (*flt).FlightChanges.Changes {
 
 			if globals.Contains(sub.ParameterChange, change.PropertyName) {
 				changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
@@ -168,34 +176,61 @@ NextSub:
 
 		}
 
-		if sub.CheckInChange && flt.FlightChanges.CheckinSlotsChange != nil {
+		if sub.CheckInChange && (*flt).FlightChanges.CheckinSlotsChange != nil {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue
 		}
-		if sub.GateChange && flt.FlightChanges.GateSlotsChange != nil {
+		if sub.GateChange && (*flt).FlightChanges.GateSlotsChange != nil {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue
 		}
-		if sub.StandChange && flt.FlightChanges.StandSlotsChange != nil {
+		if sub.StandChange && (*flt).FlightChanges.StandSlotsChange != nil {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue
 		}
-		if sub.ChuteChange && flt.FlightChanges.ChuteSlotsChange != nil {
+		if sub.ChuteChange && (*flt).FlightChanges.ChuteSlotsChange != nil {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue
 		}
-		if sub.CarouselChange && flt.FlightChanges.CarouselSlotsChange != nil {
+		if sub.CarouselChange && (*flt).FlightChanges.CarouselSlotsChange != nil {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue
 		}
 
-		if sub.AircraftTypeOrRegoChange && flt.FlightChanges.AircraftTypeChange != nil {
+		if sub.AircraftTypeOrRegoChange && (*flt).FlightChanges.AircraftTypeChange != nil {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue
 		}
-		if sub.AircraftTypeOrRegoChange && flt.FlightChanges.AircraftChange != nil {
+		if sub.AircraftTypeOrRegoChange && (*flt).FlightChanges.AircraftChange != nil {
 			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: flt}
 			continue
+		}
+	}
+
+	return
+}
+func checkForImpactedDeleteSubscription(flt models.Flight) {
+
+	sto := flt.GetSTO()
+
+	if sto.Local().After(time.Now().Local().Add(36 * time.Hour)) {
+		return
+	}
+
+	globals.UserChangeSubscriptionsMutex.Lock()
+	defer globals.UserChangeSubscriptionsMutex.Unlock()
+
+	for _, sub := range globals.UserChangeSubscriptions {
+
+		if !sub.Enabled {
+			continue
+		}
+		if sub.Airport != flt.GetIATAAirport() {
+			continue
+		}
+
+		if sub.DeleteFlight && flt.Action == globals.DeleteAction {
+			changePushJobChannel <- models.ChangePushJob{Sub: sub, Flight: &flt}
 		}
 	}
 
@@ -207,7 +242,7 @@ func executeChangePushWorker(id int, jobs <-chan models.ChangePushJob) {
 	for job := range jobs {
 		globals.Logger.Debug(fmt.Sprintf("Push Worker: %d Executing Change Push for User ", id))
 
-		queryBody, _ := json.Marshal(job.Flight)
+		queryBody, _ := json.Marshal(*job.Flight)
 		bodyReader := bytes.NewReader([]byte(queryBody))
 
 		req, err := http.NewRequest(http.MethodPost, job.Sub.DestinationURL, bodyReader)
@@ -254,10 +289,9 @@ func executeScheduledPushWorker(id int, jobs <-chan models.SchedulePushJob) {
 		var response interface{}
 		var error models.GetFlightsError
 
-		// filterMutex.Lock()
-		// defer filterMutex.Unlock()
 		if strings.ToLower(job.Sub.SubscriptionType) == "flight" {
 			response, error = GetRequestedFlightsSub(job.Sub, job.UserToken)
+
 		} else if strings.ToLower(job.Sub.SubscriptionType) == "resource" {
 			response, error = GetResourceSub(job.Sub, job.UserToken)
 		}
@@ -268,6 +302,7 @@ func executeScheduledPushWorker(id int, jobs <-chan models.SchedulePushJob) {
 		}
 
 		queryBody, _ := json.Marshal(response)
+
 		bodyReader := bytes.NewReader([]byte(queryBody))
 
 		req, err := http.NewRequest(http.MethodPost, job.Sub.DestinationURL, bodyReader)

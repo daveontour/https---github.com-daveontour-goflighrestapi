@@ -55,7 +55,7 @@ func UpdateFlightEntry(message string, append bool) {
 	}
 	globals.MapMutex.Unlock()
 
-	globals.FlightUpdatedChannel <- flight
+	globals.FlightUpdatedChannel <- models.FlightUpdateChannelMessage{FlightID: flight.GetFlightID(), AirportCode: airportCode}
 }
 func createFlightEntry(message string) {
 
@@ -83,7 +83,7 @@ func createFlightEntry(message string) {
 	upadateAllocation(flight, airportCode, false)
 	//globals.MapMutex.Unlock()
 
-	globals.FlightCreatedChannel <- flight
+	globals.FlightCreatedChannel <- models.FlightUpdateChannelMessage{FlightID: flight.GetFlightID(), AirportCode: airportCode}
 }
 func deleteFlightEntry(message string) {
 
