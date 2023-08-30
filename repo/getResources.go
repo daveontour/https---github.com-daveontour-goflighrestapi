@@ -1,9 +1,11 @@
 package repo
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -75,15 +77,26 @@ func GetResourceAPI(c *gin.Context) {
 
 	response, error := getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, sortBy, "", c)
 
-	// Create the response object so we can return early if required
-	c.Writer.Header().Set("Content-Type", "application/json")
+	fileName, err := writeResourceResponseToFile(response, &userProfile)
 
-	if error.Err == nil {
-		c.JSON(http.StatusOK, response)
+	// defer func() {
+	// 	globals.FileDeleteChannel <- fileName
+	// }()
+
+	if err == nil {
+		c.Writer.Header().Set("Content-Type", "application/json")
+		c.File(fileName)
+		defer func() {
+			err := os.Remove(fileName)
+			if err != nil {
+				fmt.Println(err.Error())
+			} else {
+				fmt.Println("Temp file deleted")
+			}
+		}()
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", error.Err.Error())})
+		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", error.Error())})
 	}
-
 }
 
 func getResourcesCommon(apt, flightID, airline, resourceType, resource, from, to, updatedSince, sortBy, userToken string, c *gin.Context) (models.ResourceResponse, models.GetFlightsError) {
@@ -426,9 +439,51 @@ func GetConfiguredResources(c *gin.Context) {
 	// Get the filtered and pruned flights for the request
 	//response, err = filterFlights(request, response, repoMap[apt].Flights, c)
 
+	file, errs := os.CreateTemp("", "getresourcettemp-*.txt")
+	if errs != nil {
+		fmt.Println(errs)
+		return
+	}
+	fwb := bufio.NewWriterSize(file, 32768)
+	defer os.Remove(file.Name())
+
+	error := response.WriteJSON(fwb)
+	error2 := fwb.WriteByte('}')
+	error3 := fwb.Flush()
+
+	if error == nil && error2 == nil && error3 == nil {
+		c.Writer.Header().Set("Content-Type", "application/json")
+		c.File(file.Name())
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", error.Error())})
+	}
+
 	if err == nil {
 		c.JSON(http.StatusOK, response)
 	} else {
 		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", err.Error())})
 	}
+}
+
+func writeResourceResponseToFile(response models.ResourceResponse, userProfile *models.UserProfile) (fileName string, e error) {
+
+	file, errs := os.CreateTemp("", "getresourcettemp-*.txt")
+	if errs != nil {
+		fmt.Println(errs)
+		return
+	}
+	defer file.Close()
+
+	// Create the response object so we can return early if required
+	fmt.Println("Temporary file created : ", file.Name())
+
+	fwb := bufio.NewWriterSize(file, 32768)
+	defer func() {
+		globals.FileDeleteChannel <- file.Name()
+	}()
+
+	response.WriteJSON(fwb)
+	fwb.Flush()
+
+	return fileName, nil
 }

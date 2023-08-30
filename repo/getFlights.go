@@ -46,14 +46,14 @@ func GetUserProfile(c *gin.Context, userToken string) models.UserProfile {
 	return userProfile
 
 }
-func GetRequestedFlightsAPI(c *gin.Context) {
 
+func GetRequestedFlightsAPI(c *gin.Context) {
 	defer globals.ExeTime(fmt.Sprintf("Get Flight Processing time for %s", c.Request.RequestURI))()
-	// Get the profile of the user making the request
+
 	userProfile := GetUserProfile(c, "")
 
 	if !userProfile.Enabled {
-		c.JSON(http.StatusUnauthorized, gin.H{"Error": fmt.Sprintf("%s", "User Access Has Been Disabled")})
+		c.JSON(http.StatusUnauthorized, gin.H{"Error": "User Access Has Been Disabled"})
 		return
 	}
 
@@ -78,72 +78,35 @@ func GetRequestedFlightsAPI(c *gin.Context) {
 
 	response, _ := GetRequestedFlightsCommon(apt, direction, airline, flt, from, to, route, "", c, nil)
 
-	file, errs := os.CreateTemp("", "getflighttemp-*.txt")
-	if errs != nil {
-		fmt.Println(errs)
-		return
-	}
-	fwb := bufio.NewWriterSize(file, 20000)
-	defer os.Remove(file.Name())
+	fileName, err := writeFlightResponseToFile(response, &userProfile)
 
-	fmt.Println("The temporary file is created:", file.Name())
-	fwb.WriteByte('{')
-	fwb.WriteString(fmt.Sprintf("\"Airport\":\"%s\",", response.AirportCode))
-	fwb.WriteString(fmt.Sprintf("\"Direction\":\"%s\",", response.Direction))
-	fwb.WriteString(fmt.Sprintf("\"ScheduleFlightsFrom\":\"%s\",", response.From))
-	fwb.WriteString(fmt.Sprintf("\"ScheduleFlightsTo\":\"%s\",", response.To))
-	fwb.WriteString(fmt.Sprintf("\"NumberOfFlights\":\"%v\",", response.NumberOfFlights))
-	if response.Airline != "" {
-		fwb.WriteString(fmt.Sprintf("\"Airline\":\"%s\",", response.Airline))
-	} else {
-		fwb.WriteString("\"Airline\":\"*\",")
-	}
-	if response.Flight != "" {
-		fwb.WriteString(fmt.Sprintf("\"Flight\":\"%s\",", response.Flight))
-	} else {
-		fwb.WriteString("\"Flight\":\"*\",")
-	}
-	if response.Route != "" {
-		fwb.WriteString(fmt.Sprintf("\"Route\":\"%s\",", response.Route))
-	} else {
-		fwb.WriteString("\"Route\":\"*\",")
-	}
-	fwb.WriteString("\"CustomFieldQuery\":[")
-	for idx, w := range response.CustomFieldQuery {
-		if idx > 0 {
-			fwb.WriteString(",")
-		}
-		fwb.WriteString(fmt.Sprintf("{\"%s\":\"%s\"}", w.Parameter, w.Value))
-	}
-	fwb.WriteString("],")
-
-	fwb.WriteString("\"Warnings\":[")
-	for idx, w := range response.Warnings {
-		if idx > 0 {
-			fwb.WriteString(",")
-		}
-		fwb.WriteString(fmt.Sprintf("\"%s\"", w))
-	}
-	fwb.WriteString("],")
-
-	fwb.WriteString("\"Errors\":[")
-	for idx, w := range response.Errors {
-		if idx > 0 {
-			fwb.WriteString(",")
-		}
-		fwb.WriteString(fmt.Sprintf("\"%s\"", w))
-	}
-	fwb.WriteString("],")
-
-	error := models.WriteFlightsInJSON(fwb, response.ResponseFlights, &userProfile)
-	error2 := fwb.WriteByte('}')
-	error3 := fwb.Flush()
-
-	if error == nil && error2 == nil && error3 == nil {
+	if err == nil {
 		c.Writer.Header().Set("Content-Type", "application/json")
-		c.File(file.Name())
+		c.File(fileName)
+
+		// f, _ := os.OpenFile(fileName, os.O_RDONLY, 0777)
+		// fi, err := f.Stat()
+		// if err != nil {
+		// 	// Could not obtain stat, handle error
+		// }
+
+		// c.DataFromReader(200, fi.Size(), "application/json", f, nil)
+
+		defer func() {
+			// err = f.Close()
+			// if err != nil {
+			// 	fmt.Println(err.Error())
+			// } else {
+			err := os.Remove(fileName)
+			if err != nil {
+				fmt.Println(err.Error())
+			} else {
+				fmt.Println("Temp file deleted")
+			}
+			//		}
+		}()
 	} else {
-		c.JSON(http.StatusBadRequest, gin.H{"Error": fmt.Sprintf("%s", error.Error())})
+		c.JSON(http.StatusBadRequest, gin.H{"Error": err.Error()})
 	}
 }
 
@@ -461,6 +424,77 @@ NextFlight:
 	response.CustomFieldQuery = request.PresentQueryableParameters
 
 	return response, nil
+}
+
+func writeFlightResponseToFile(response models.Response, userProfile *models.UserProfile) (fileName string, e error) {
+
+	file, errs := os.CreateTemp("", "getflighttemp-*.txt")
+	if errs != nil {
+		fmt.Println(errs)
+		return
+	}
+	fwb := bufio.NewWriterSize(file, 32768)
+	defer file.Close()
+
+	fmt.Println("The temporary file is created:", file.Name())
+	fwb.WriteByte('{')
+	fwb.WriteString("\"Airport\":\"" + response.AirportCode + "\",")
+	fwb.WriteString("\"Direction\":\"" + response.Direction + "\",")
+	fwb.WriteString("\"ScheduleFlightsFrom\":\"" + response.From + "\",")
+	fwb.WriteString("\"ScheduleFlightsTo\":\"" + response.To + "\",")
+	fwb.WriteString("\"NumberOfFlights\":\"" + fmt.Sprintf("%v", response.NumberOfFlights) + "\",")
+	if response.Airline != "" {
+		fwb.WriteString("\"Airline\":\"" + response.Airline + "\",")
+	} else {
+		fwb.WriteString("\"Airline\":\"*\",")
+	}
+	if response.Flight != "" {
+		fwb.WriteString("\"Flight\":\"" + response.Flight + "\",")
+	} else {
+		fwb.WriteString("\"Flight\":\"*\",")
+	}
+	if response.Route != "" {
+		fwb.WriteString("\"Route\":\"" + response.Route + "\",")
+	} else {
+		fwb.WriteString("\"Route\":\"*\",")
+	}
+	fwb.WriteString("\"CustomFieldQuery\":[")
+	for idx, w := range response.CustomFieldQuery {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString("{\"Parameter\":\"" + w.Parameter + "\",\"Value\":\"" + w.Value + "\"}")
+	}
+	fwb.WriteString("],")
+
+	fwb.WriteString("\"Warnings\":[")
+	for idx, w := range response.Warnings {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString("\"" + w + "\"")
+	}
+	fwb.WriteString("],")
+
+	fwb.WriteString("\"Errors\":[")
+	for idx, w := range response.Errors {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString("\"" + w + "\"")
+	}
+	fwb.WriteString("],")
+
+	err := models.WriteFlightsInJSON(fwb, response.ResponseFlights, userProfile)
+	err2 := fwb.WriteByte('}')
+	err3 := fwb.Flush()
+
+	if err == nil && err2 == nil && err3 == nil {
+		return file.Name(), nil
+	} else {
+		return "", errors.New("error creating response file")
+	}
+
 }
 
 // Creates a copy of the flight record with the custom fields that the user is allowed to see

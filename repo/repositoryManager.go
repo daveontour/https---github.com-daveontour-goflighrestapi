@@ -290,8 +290,11 @@ func MaintainRepository(airportCode string, perfTest bool) {
 
 		// Read the messages from the queue
 		go func() {
+			i := 1
 			for d := range msgs {
 				globals.Logger.Debug("Rabbit Message Received")
+				fmt.Println("Rabbit Message Received ", i)
+				i++
 				message := string(d.Body[:])
 
 				globals.Logger.Debug(fmt.Sprintf("Received Message length %d\n", len(message)))

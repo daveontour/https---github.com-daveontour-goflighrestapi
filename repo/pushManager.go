@@ -3,15 +3,13 @@ package repo
 import (
 	"bytes"
 	"crypto/tls"
+	"os"
 
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
-
-	//"github.com/goccy/go-json"
 
 	"github.com/go-co-op/gocron"
 
@@ -20,21 +18,19 @@ import (
 	"flightresourcerestapi/timeservice"
 )
 
-var schedPushLock sync.Mutex
-
 // Channels for handling the push notifications
 // The size of the channel is the number of elements the channel can
 // buffer without blocking
 var changePushJobChannel = make(chan models.ChangePushJob, 20)
 var schedulePushJobChannel = make(chan models.SchedulePushJob, 20)
 
-func ReloadschedulePushes(airportCode string) {
-	if _, ok := globals.SchedulerMap[airportCode]; ok {
-		globals.SchedulerMap[airportCode].Clear()
-		delete(globals.SchedulerMap, airportCode)
-	}
-	go SchedulePushes(airportCode, false)
-}
+// func ReloadschedulePushes(airportCode string) {
+// 	if _, ok := globals.SchedulerMap[airportCode]; ok {
+// 		globals.SchedulerMap[airportCode].Clear()
+// 		delete(globals.SchedulerMap, airportCode)
+// 	}
+// 	go SchedulePushes(airportCode, false)
+// }
 
 func StartChangePushWorkerPool(numWorkers int) {
 	for w := 1; w <= numWorkers; w++ {
@@ -74,17 +70,21 @@ func SchedulePushes(airportCode string, demoMode bool) {
 			token := u.Key
 
 			if sub.ReptitionHours != 0 {
-				s.Every(sub.ReptitionHours).Hours().StartAt(startTime).Tag(token).Do(func() { schedulePushJobChannel <- models.SchedulePushJob{Sub: sub, UserToken: token, UserName: user} })
+				s.Every(sub.ReptitionHours).Hours().StartAt(startTime).Tag(token).Do(func() {
+					schedulePushJobChannel <- models.SchedulePushJob{Sub: sub, UserToken: token, UserName: user, UserProfile: &u}
+				})
 				globals.Logger.Info(fmt.Sprintf("Scheduled Push for user %s, starting from %s, repeating every %v hours", u.UserName, startTimeStr, sub.ReptitionHours))
 			}
 			if sub.ReptitionMinutes != 0 {
-				s.Every(sub.ReptitionMinutes).Minutes().StartAt(time.Now()).Tag(token).Do(func() { schedulePushJobChannel <- models.SchedulePushJob{Sub: sub, UserToken: token, UserName: user} })
+				s.Every(sub.ReptitionMinutes).Minutes().StartAt(time.Now()).Tag(token).Do(func() {
+					schedulePushJobChannel <- models.SchedulePushJob{Sub: sub, UserToken: token, UserName: user, UserProfile: &u}
+				})
 				globals.Logger.Info(fmt.Sprintf("Scheduled Push for user %s, starting from now, repeating every %v minutes", u.UserName, sub.ReptitionMinutes))
 
 			}
 
 			if sub.PushOnStartUp {
-				schedulePushJobChannel <- models.SchedulePushJob{Sub: sub, UserToken: token, UserName: user}
+				schedulePushJobChannel <- models.SchedulePushJob{Sub: sub, UserToken: token, UserName: user, UserProfile: &u}
 			}
 		}
 	}
@@ -280,61 +280,76 @@ func executeChangePushWorker(id int, jobs <-chan models.ChangePushJob) {
 
 func executeScheduledPushWorker(id int, jobs <-chan models.SchedulePushJob) {
 
-	// schedPushLock.Lock()
-	// defer schedPushLock.Unlock()
-
 	for job := range jobs {
+
 		globals.Logger.Info(fmt.Sprintf("Executing Scheduled Push for User %s", job.UserName))
 
-		var response interface{}
-		var error models.GetFlightsError
-
 		if strings.ToLower(job.Sub.SubscriptionType) == "flight" {
-			response, error = GetRequestedFlightsSub(job.Sub, job.UserToken)
+
+			flightresponse, _ := GetRequestedFlightsSub(job.Sub, job.UserToken)
+			fileName, _ := writeFlightResponseToFile(flightresponse, job.UserProfile)
+
+			defer func() {
+				globals.FileDeleteChannel <- fileName
+			}()
+
+			sendViaHTTPClient(fileName, &job)
 
 		} else if strings.ToLower(job.Sub.SubscriptionType) == "resource" {
-			response, error = GetResourceSub(job.Sub, job.UserToken)
+			resourceresponse, _ := GetResourceSub(job.Sub, job.UserToken)
+			fileName, _ := writeResourceResponseToFile(resourceresponse, job.UserProfile)
+
+			defer func() {
+				globals.FileDeleteChannel <- fileName
+			}()
+
+			sendViaHTTPClient(fileName, &job)
 		}
+	}
+}
 
-		if error.Err != nil {
-			globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error with scheduled push %s", job.UserName, error.Error()))
-			return
-		}
+func sendViaHTTPClient(fileName string, job *models.SchedulePushJob) {
 
-		queryBody, _ := json.Marshal(response)
+	bytesdata, _ := os.ReadFile(fileName)
 
-		bodyReader := bytes.NewReader([]byte(queryBody))
-
-		req, err := http.NewRequest(http.MethodPost, job.Sub.DestinationURL, bodyReader)
+	defer func() {
+		err := os.Remove(fileName)
 		if err != nil {
-			globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: could not create request: %s\n", job.UserName, err))
+			fmt.Println(err.Error())
+		} else {
+			fmt.Println("Temp file deleted for HTTP Client Send")
 		}
+	}()
 
-		req.Header.Set("Content-Type", "application/json")
-		for _, pair := range job.Sub.HeaderParameters {
-			req.Header.Add(pair.Parameter, pair.Value)
-		}
+	req, err := http.NewRequest(http.MethodPost, job.Sub.DestinationURL, bytes.NewReader(bytesdata))
+	if err != nil {
+		globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: could not create request: %s\n", job.UserName, err))
+	}
 
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: job.Sub.TrustBadCertificates},
-		}
-		client := http.Client{
-			Timeout:   20 * time.Second,
-			Transport: tr,
-		}
-		r, sendErr := client.Do(req)
+	req.Header.Set("Content-Type", "application/json")
+	for _, pair := range job.Sub.HeaderParameters {
+		req.Header.Add(pair.Parameter, pair.Value)
+	}
 
-		if sendErr != nil {
-			globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error making http request: %s\n", job.UserName, sendErr))
-			return
-		}
-		if r == nil {
-			globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error making http request to: %s\n", job.UserName, job.Sub.DestinationURL))
-			return
-		}
-		if r.StatusCode != 200 {
-			globals.Logger.Error(fmt.Sprintf("Scheduled Push Client. Error making HTTP request: Returned status code = %v. URL = %s", r.StatusCode, job.Sub.DestinationURL))
-			return
-		}
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: job.Sub.TrustBadCertificates},
+	}
+	client := http.Client{
+		Timeout:   20 * time.Second,
+		Transport: tr,
+	}
+	r, sendErr := client.Do(req)
+
+	if sendErr != nil {
+		globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error making http request: %s\n", job.UserName, sendErr))
+		return
+	}
+	if r == nil {
+		globals.Logger.Error(fmt.Sprintf("Scheduled Push Client for user %s: Error making http request to: %s\n", job.UserName, job.Sub.DestinationURL))
+		return
+	}
+	if r.StatusCode != 200 {
+		globals.Logger.Error(fmt.Sprintf("Scheduled Push Client. Error making HTTP request: Returned status code = %v. URL = %s", r.StatusCode, job.Sub.DestinationURL))
+		return
 	}
 }

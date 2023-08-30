@@ -63,7 +63,9 @@
                     "ResourceID": "",
                     "Route": "",
                     "Direction": "",
-                    "TrustBadCertificates":true
+                    "TrustBadCertificates":true,
+                    "All":true
+
                 }
             ]
         },

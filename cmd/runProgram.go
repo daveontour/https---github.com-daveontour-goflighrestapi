@@ -21,7 +21,7 @@ func runProgram() {
 	globals.Wg.Add(1)
 
 	// The HTTP Server
-	go server.StartGinServer()
+	go server.StartGinServer(false)
 
 	// Handler for the different types of messages passed by channels
 	go eventMonitor()

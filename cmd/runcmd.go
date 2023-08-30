@@ -1,10 +1,8 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -60,45 +58,17 @@ var demoCmd = &cobra.Command{
 	Run: func(cmds *cobra.Command, args []string) {
 		globals.IsDebug = true
 		splash(2)
-		demo(args[0], args[1])
-	},
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 2 {
-			return errors.New("Number of initial flights and custom properties not specified")
-		}
-		_, err := strconv.Atoi(args[0])
-		if err != nil {
-			return errors.New("Invalid format or invalid number of flights entered on command line")
-		}
-		_, err = strconv.Atoi(args[1])
-		if err != nil {
-			return errors.New("Invalid format or invalid number of custom properties entered on command line")
-		}
-		return nil
+		demo()
 	},
 }
 var perfTestCmd = &cobra.Command{
-	Use:   "perfTest {number of flights to create} {number of custom properties}",
+	Use:   "perfTest",
 	Short: `Run in Performance Testing mode`,
 	Long:  "\nThis will run the system in demonstration mode where resources and flights will be created based on the configuration in test.json\nRabbit MQ is required, but AMS is not required",
 	Run: func(cmds *cobra.Command, args []string) {
 		globals.IsDebug = true
 		splash(0)
-		perfTest(args[0], args[1])
-	},
-	Args: func(cmd *cobra.Command, args []string) error {
-		if len(args) < 2 {
-			return errors.New("Number of initial flights not specified")
-		}
-		_, err := strconv.Atoi(args[0])
-		if err != nil {
-			return errors.New("Invalid format or invalid number of flights entered on command line")
-		}
-		_, err = strconv.Atoi(args[1])
-		if err != nil {
-			return errors.New("Invalid format or invalid number of custom properties entered on command line")
-		}
-		return nil
+		perfTest()
 	},
 }
 
@@ -180,6 +150,32 @@ func eventMonitor() {
 
 		case numflight := <-globals.FlightsInitChannel:
 			globals.Logger.Trace(fmt.Sprintf("Flight Initialised or Refreshed: %v", numflight))
+
+		case fileDelete := <-globals.FileDeleteChannel:
+			go deleteFile(fileDelete)
 		}
 	}
+}
+
+func deleteFile(fileDelete string) {
+
+	fmt.Println("Starting File Deleted ", fileDelete)
+	deleted := false
+	_, existErr := os.Stat(fileDelete)
+	if existErr != nil {
+		deleted = true
+	}
+
+	for !deleted {
+		time.Sleep(5 * time.Second)
+		err := os.Remove(fileDelete)
+		if err == nil {
+			deleted = true
+		}
+		_, existErr := os.Stat(fileDelete)
+		if existErr != nil {
+			deleted = true
+		}
+	}
+	fmt.Println("File Deleted ", fileDelete)
 }

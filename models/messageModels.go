@@ -2,9 +2,7 @@ package models
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -272,101 +270,15 @@ func (ll *ResourceLinkedList) NumberOfFlightAllocations() (n int) {
 }
 
 type FlightResponseItem struct {
-	// NextNode  *FlightResponseItem
-	// PrevNode  *FlightResponseItem
 	FlightPtr *Flight
 	STO       time.Time
 }
-
-// type FlightResponseLinkedList struct {
-// 	Head *FlightResponseItem
-// 	Tail *FlightResponseItem
-// }
-
-// func (ll *FlightResponseLinkedList) Sort() {
-// 	currentNode := ll.Head
-// 	if currentNode == nil {
-// 		return
-// 	}
-// 	for currentNode != nil {
-// 		indexNode := currentNode.NextNode
-// 		for indexNode != nil {
-// 			if currentNode.FlightPtr.GetSTO().After(indexNode.FlightPtr.GetSTO()) {
-// 				temp := currentNode.FlightPtr
-// 				currentNode.FlightPtr = indexNode.FlightPtr
-// 				indexNode.FlightPtr = temp
-// 			}
-// 			indexNode = indexNode.NextNode
-// 		}
-// 		currentNode = currentNode.NextNode
-// 	}
-// }
-
-// func (ll *FlightResponseLinkedList) AddNode(newNode FlightResponseItem) {
-
-// 	newNode.PrevNode = ll.Tail
-// 	newNode.NextNode = nil
-
-// 	if ll.Tail != nil {
-// 		ll.Tail.NextNode = &newNode
-// 	}
-
-// 	ll.Tail = &newNode
-
-// 	if ll.Head == nil {
-// 		ll.Head = &newNode
-// 	}
-// }
-
-// func (ll *FlightResponseLinkedList) Len() (count int) {
-
-// 	if ll.Head == nil {
-// 		count = 0
-// 		return
-// 	}
-
-// 	currentNode := ll.Head
-// 	count = 1
-// 	for currentNode != nil {
-// 		currentNode = currentNode.NextNode
-// 		count++
-// 	}
-
-// 	return
-
-// }
 
 // FlightLinkedList represents the doubly linked list.
 type FlightLinkedList struct {
 	Head *Flight
 	Tail *Flight
 }
-
-// func (r FlightResponseLinkedList) WriteJSON(fwb *bufio.Writer) error {
-
-// 	//var sb strings.Builder
-
-// 	fwb.WriteString(`"Flights":[`)
-
-// 	currentNode := r.Head
-
-// 	idx := 0
-// 	for currentNode != nil {
-// 		if idx > 0 {
-// 			fwb.WriteByte(',')
-// 		}
-// 		(currentNode.FlightPtr).WriteJSON(fwb)
-// 		//fwb.Write(fs)
-// 		currentNode = currentNode.NextNode
-// 		idx++
-// 	}
-
-// 	fwb.WriteByte(']')
-
-// 	return nil
-
-// 	//return []byte(sb.String()), nil
-// }
 
 func WriteFlightsInJSON(fwb *bufio.Writer, flights []FlightResponseItem, userProfile *UserProfile) error {
 	fwb.WriteString(`"Flights":[`)
@@ -478,7 +390,8 @@ func (ll *FlightLinkedList) ReplaceOrAddNode(node Flight) {
 			currentNode.PrevNode = nil
 			currentNode.NextNode = nil
 
-			return // Node found and replaced, exit the function
+			// Node found and replaced, exit the function
+			return
 		}
 		currentNode = currentNode.NextNode
 	}
@@ -578,11 +491,7 @@ type Response struct {
 	CustomFieldQuery []ParameterValuePair `json:"CustomFieldQueries,omitempty"`
 	Warnings         []string             `json:"Warnings,omitempty"`
 	Errors           []string             `json:"Errors,omitempty"`
-	//	Flights          []Flight                 `json:"Flights,omitempty"`
-	//Flights         []Flight                 `json:"-"`
-	ResponseFlights []FlightResponseItem `json:"Flights,omitempty"`
-	//ResponseFlights FlightResponseLinkedList `json:"Flights,omitempty"`
-	//ResponseFlights FlightResponseLinkedList `json:"-"`
+	ResponseFlights  []FlightResponseItem `json:"Flights,omitempty"`
 }
 
 type ResourceResponse struct {
@@ -611,60 +520,79 @@ func (r *Response) AddWarning(w string) {
 func (r *Response) AddError(w string) {
 	r.Errors = append(r.Errors, w)
 }
-func (d AllocationResponseItem) MarshalJSON() ([]byte, error) {
 
-	var sb strings.Builder
-	sb.WriteString("{")
+func (d ResourceResponse) WriteJSON(fwb *bufio.Writer) error {
 
-	st, _ := json.Marshal(d.ResourceType)
-	sb.WriteString(fmt.Sprintf("\"ResourceType\":%s,", string(st)))
-	st2, _ := json.Marshal(d.Name)
-	sb.WriteString(fmt.Sprintf("\"Name\":%s,", string(st2)))
-	st3, _ := json.Marshal(d.Area)
-	sb.WriteString(fmt.Sprintf("\"Area\":%s,", string(st3)))
+	fwb.WriteString("{")
 
-	st4, _ := json.Marshal(d.AllocationItem.From)
-	sb.WriteString(fmt.Sprintf("\"AllocationStart\":%s,", string(st4)))
-	st5, _ := json.Marshal(d.AllocationItem.To)
-	sb.WriteString(fmt.Sprintf("\"AllocationEnd\":%s,", string(st5)))
-
-	sb.WriteString("\"Flight\": {")
-
-	f1, _ := json.Marshal(d.AllocationItem.FlightID)
-	sb.WriteString(fmt.Sprintf("\"FlightID\":%s,", string(f1)))
-
-	f2, _ := json.Marshal(d.AllocationItem.Direction)
-	sb.WriteString(fmt.Sprintf("\"Direction\":%s,", string(f2)))
-
-	f3, _ := json.Marshal(d.AllocationItem.Route)
-	sb.WriteString(fmt.Sprintf("\"Route\":%s,", string(f3)))
-
-	if d.AllocationItem.AircraftRegistration != "" {
-		f4, _ := json.Marshal(d.AllocationItem.AircraftRegistration)
-		sb.WriteString(fmt.Sprintf("\"AircraftRegistration\":%s,", string(f4)))
+	fwb.WriteString("\"Airport\":\"" + d.AirportCode + "\",")
+	fwb.WriteString("\"ResourceType\":\"" + d.ResourceType + "\",")
+	fwb.WriteString("\"ResourceName\":\"" + d.ResourceID + "\",")
+	fwb.WriteString("\"AllocationStart\":\"" + d.FromResource + "\",")
+	fwb.WriteString("\"AllocationEnd\":\"" + d.ToResource + "\",")
+	fwb.WriteString("\"FlightNumber\":\"" + d.FlightID + "\",")
+	fwb.WriteString("\"Airline\":\"" + d.Airline + "\",")
+	fwb.WriteString("\"CustomFieldQuery\":[")
+	for idx, w := range d.CustomFieldQuery {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString("{\"" + w.Parameter + "\":\"" + w.Value + "\"}")
 	}
+	fwb.WriteString("],")
 
-	if d.AllocationItem.AircraftType != "" {
-		f5, _ := json.Marshal(d.AllocationItem.AircraftType)
-		sb.WriteString(fmt.Sprintf("\"AircraftType\":%s", string(f5)))
+	fwb.WriteString("\"Warnings\":[")
+	for idx, w := range d.Warnings {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString("\"" + w + "\"")
 	}
-	sb.WriteString(" },")
+	fwb.WriteString("],")
 
-	s := CleanJSON(sb)
+	fwb.WriteString("\"Errors\":[")
+	for idx, w := range d.Errors {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		fwb.WriteString("\"" + w + "\"")
+	}
+	fwb.WriteString("],")
+	fwb.WriteString("\"Allocations\": [")
+	for idx, a := range d.Allocations {
+		if idx > 0 {
+			fwb.WriteString(",")
+		}
+		a.WriteJSON(fwb)
+	}
+	fwb.WriteString("]")
+	fwb.WriteString("}")
 
-	return []byte(s), nil
+	return nil
 }
 
-func CleanJSON(sb strings.Builder) string {
+func (d AllocationResponseItem) WriteJSON(fwb *bufio.Writer) error {
 
-	s := sb.String()
-	if last := len(s) - 1; last >= 0 && s[last] == ',' {
-		s = s[:last]
+	fwb.WriteString("{")
+	fwb.WriteString("\"ResourceType\":\"" + d.ResourceType + "\",")
+	fwb.WriteString("\"Name\":\"" + d.Name + "\",")
+	fwb.WriteString("\"Area\":\"" + d.Area + "\",")
+	fwb.WriteString(fmt.Sprintf("\"AllocationStart\":\"%s\",", d.AllocationItem.From))
+	fwb.WriteString(fmt.Sprintf("\"AllocationEnd\":\"%s\",", d.AllocationItem.To))
+	fwb.WriteString("\"Flight\": {")
+	fwb.WriteString("\"FlightID\":\"" + d.AllocationItem.FlightID + "\",")
+	fwb.WriteString("\"Direction\":\"" + d.AllocationItem.Direction + "\",")
+	fwb.WriteString("\"Route\":\"" + d.AllocationItem.Route + "\",")
+
+	if d.AllocationItem.AircraftRegistration != "" {
+		fwb.WriteString("\"AircraftRegistration\":\"" + d.AllocationItem.AircraftRegistration + "\",")
 	}
+	if d.AllocationItem.AircraftType != "" {
+		fwb.WriteString("\"AircraftType\":\"" + d.AllocationItem.AircraftType + "\"")
+	}
+	fwb.WriteString(" }}")
 
-	s = s + "}"
-
-	return s
+	return nil
 }
 
 type GetFlightsError struct {
@@ -681,7 +609,8 @@ type ChangePushJob struct {
 	Flight *Flight
 }
 type SchedulePushJob struct {
-	Sub       UserPushSubscription
-	UserToken string
-	UserName  string
+	Sub         UserPushSubscription
+	UserToken   string
+	UserName    string
+	UserProfile *UserProfile
 }

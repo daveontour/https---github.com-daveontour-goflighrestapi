@@ -39,6 +39,7 @@ var RepositoryUpdateChannel = make(chan int)
 var FlightUpdatedChannel = make(chan models.FlightUpdateChannelMessage)
 var FlightCreatedChannel = make(chan models.FlightUpdateChannelMessage)
 var FlightDeletedChannel = make(chan models.Flight)
+var FileDeleteChannel = make(chan string)
 var FlightsInitChannel = make(chan int)
 
 var SchedulerMap = make(map[string]*gocron.Scheduler)

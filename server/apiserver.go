@@ -13,7 +13,6 @@ import (
 
 	"fmt"
 	"io"
-	"strconv"
 
 	"math/big"
 	"net/http"
@@ -25,7 +24,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func StartGinServer() {
+func StartGinServer(demoMode bool) {
 
 	mode := gin.ReleaseMode
 	if globals.ConfigViper.GetBool("DebugService") {
@@ -86,17 +85,41 @@ func StartGinServer() {
 		_, _ = c.Writer.Write(data)
 	})
 
-	router.GET("/admin/perftest/:num", func(c *gin.Context) {
-		if hasAdminToken(c) {
-			num := c.Param("num")
-			nf, _ := strconv.Atoi(num)
-			repo.SendUpdateMessages(nf)
+	// router.GET("/admin/perftest/:num", func(c *gin.Context) {
+	// 	if hasAdminToken(c) {
+	// 		num := c.Param("num")
+	// 		nf, _ := strconv.Atoi(num)
+	// 		repo.SendUpdateMessages(nf)
 
-			c.JSON(http.StatusOK, gin.H{"PerformanceTest": fmt.Sprintf("Done")})
-		} else {
-			c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
-		}
-	})
+	// 		c.JSON(http.StatusOK, gin.H{"PerformanceTest": fmt.Sprintf("Done")})
+	// 	} else {
+	// 		c.JSON(http.StatusForbidden, gin.H{"Error": fmt.Sprintf("Not Authorized")})
+	// 	}
+	// })
+
+	if demoMode {
+		router.POST("/demoMessageAppend", func(c *gin.Context) {
+			xmlData, err := io.ReadAll(c.Request.Body)
+			if err != nil {
+				// Handle error
+			}
+			fmt.Println("Demo flight append message received")
+			repo.UpdateFlightEntry(string(xmlData), true)
+		})
+		router.POST("/demoMessageUpdate", func(c *gin.Context) {
+			xmlData, err := io.ReadAll(c.Request.Body)
+			if err != nil {
+				// Handle error
+			}
+			fmt.Println("Demo flight uppdate message received")
+			repo.UpdateFlightEntry(string(xmlData), false)
+		})
+
+		router.GET("/demoPrepare", func(c *gin.Context) {
+			repo.PerfTestInit()
+		})
+
+	}
 
 	// router.GET("/admin/perftestinit/:num", func(c *gin.Context) {
 	// 	if hasAdminToken(c) {
