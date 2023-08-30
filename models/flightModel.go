@@ -2,6 +2,7 @@ package models
 
 import (
 	"bufio"
+	"encoding/json"
 	"encoding/xml"
 	"flightresourcerestapi/timeservice"
 	"fmt"
@@ -647,7 +648,7 @@ type FlightChanges struct {
 	StandSlotsChange    *StandSlotChange     `xml:"StandSlotsChange" json:"StandSlotsChange"`
 	ChuteSlotsChange    *ChuteSlotsChange    `xml:"ChuteSlotsChange" json:"ChuteSlotsChange"`
 	CheckinSlotsChange  *CheckInSlotsChange  `xml:"CheckInSlotsChange" json:"CheckInSlotsChange"`
-	Changes             []Change             `xml:"PropertyChanges"`
+	Changes             []Change             `xml:"Change"  json:"-" `
 }
 type Flight struct {
 	PrevNode      *Flight       `xml:"-" json:"-"`
@@ -670,7 +671,23 @@ func (d *Flight) WriteJSON(fwb *bufio.Writer, userProfile *UserProfile) error {
 	fwb.WriteString(`"FlightState":`)
 	d.FlightState.WriteJSON(fwb, userProfile)
 
-	fwb.WriteString("}")
+	// Using the built in JSON serialiser for the Changes because I'm too lazy to write a custom serilaizer
+	flightChanges, _ := json.Marshal(d.FlightChanges)
+	fwb.WriteString(",\n\"Changes\":")
+	fwb.Write(flightChanges)
+	fwb.WriteString(",\n\"ValueChanges\":[")
+	f := false
+	for idx, c := range d.FlightChanges.Changes {
+		if contains(userProfile.AllowedCustomFields, c.PropertyName) || contains(userProfile.AllowedCustomFields, "*") {
+			if idx > 0 && f {
+				fwb.WriteString(",")
+			}
+			f = true
+			fwb.WriteString("{\"PropertyName\":\"" + c.PropertyName + "\", \"OldValue\":\"" + c.OldValue + "\",\"NewValue\":\"" + c.NewValue + "\"}")
+		}
+	}
+
+	fwb.WriteString("]}")
 
 	return nil
 

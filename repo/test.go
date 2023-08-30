@@ -1,9 +1,9 @@
 package repo
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
-
 	"os"
 	"path/filepath"
 
@@ -12,6 +12,7 @@ import (
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/models"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/spf13/viper"
 )
 
@@ -97,6 +98,22 @@ func PerfTestInit() {
 	if !globals.DemoMode {
 		go MaintainRepository(config.TestConfig.Repository.AMSAirport, true)
 		time.Sleep(time.Duration(1 * time.Second))
+	}
+
+	db, err := sql.Open("sqlite3", "APT.db")
+	defer db.Close()
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	sts := `
+	DROP TABLE IF EXISTS flights;
+	CREATE TABLE flights(id INTEGER PRIMARY KEY, flightid TEXT, jsonflight TEXT);
+	`
+	_, err = db.Exec(sts)
+
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	(*rep).CurrentLowerLimit = time.Now().Add(-60 * 24 * 15 * time.Minute)

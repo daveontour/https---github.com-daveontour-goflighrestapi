@@ -176,6 +176,46 @@
  %s <!-- GateSlots -->
  %s <!--CarouselSlots -->
         </FlightState>
+        <FlightChanges xmlns="http://www.sita.aero/ams6-xml-api-datatypes">
+          <Change propertyName="S--G_DepartureStandType">
+            <OldValue />
+            <NewValue>Contact</NewValue>
+          </Change>
+          <Change propertyName="S--G_StandArea">
+            <OldValue />
+            <NewValue>Apron 1</NewValue>
+          </Change>
+          <Change propertyName="PrevStandTemp">
+            <OldValue />
+            <NewValue>101</NewValue>
+          </Change>
+          <Change propertyName="Stand">
+            <OldValue />
+            <NewValue>101</NewValue>
+          </Change>
+          <StandSlotsChange>
+            <OldValue>
+              <StandSlot>
+                <Value propertyName="StartTime">2023-08-30T21:20:00</Value>
+                <Value propertyName="EndTime">2023-08-30T23:20:00</Value>
+              </StandSlot>
+            </OldValue>
+            <NewValue>
+              <StandSlot>
+                <Value propertyName="StartTime">2023-08-30T21:20:00</Value>
+                <Value propertyName="EndTime">2023-08-30T23:20:00</Value>
+                <Stand>
+                  <Value propertyName="Name">101</Value>
+                  <Value propertyName="ExternalName">101</Value>
+                  <Area>
+                    <Value propertyName="Name">Apron 1</Value>
+                  </Area>
+                </Stand>
+              </StandSlot>
+            </NewValue>
+          </StandSlotsChange>
+        </FlightChanges>
+
       </Flight>
     </FlightUpdatedNotification>
   </Content>

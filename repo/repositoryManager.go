@@ -1,7 +1,16 @@
 package repo
 
+/*
+
+Functions is this file control the intializatio of the repository for each airport
+Intial load of resources and flights are made, listeners are started to listen for
+updates and the refresh of the repository is scheduled
+
+*/
+
 import (
 	"bytes"
+	//	"database/sql"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -17,6 +26,7 @@ import (
 	"flightresourcerestapi/models"
 	"flightresourcerestapi/timeservice"
 
+	//	_ "github.com/mattn/go-sqlite3"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -103,6 +113,22 @@ func initRepository(airportCode string) {
 		globals.Logger.Warn(fmt.Sprintf("AMS Webservice API or AMS RestAPI not avaiable for %s. Will try again in 8 seconds", airportCode))
 		time.Sleep(8 * time.Second)
 	}
+
+	// db, err := sql.Open("sqlite3", airportCode+".db")
+	// defer db.Close()
+
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// sts := `
+	// DROP TABLE IF EXISTS flights;
+	// CREATE TABLE flights(id INTEGER PRIMARY KEY, flightid TEXT, jsonflight TEXT);
+	// `
+	// _, err = db.Exec(sts)
+
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	//Clear the MSMQ notifiaction queue if using MSMQ
 	clearMSMQ(airportCode)

@@ -85,6 +85,7 @@ func GetResourceAPI(c *gin.Context) {
 
 	if err == nil {
 		c.Writer.Header().Set("Content-Type", "application/json")
+
 		c.File(fileName)
 		defer func() {
 			err := os.Remove(fileName)
@@ -475,15 +476,15 @@ func writeResourceResponseToFile(response models.ResourceResponse, userProfile *
 	defer file.Close()
 
 	// Create the response object so we can return early if required
-	fmt.Println("Temporary file created : ", file.Name())
+	fmt.Println("Temporary RESOURCE file created : ", file.Name())
 
 	fwb := bufio.NewWriterSize(file, 32768)
-	defer func() {
-		globals.FileDeleteChannel <- file.Name()
-	}()
+	// defer func() {
+	// 	globals.FileDeleteChannel <- file.Name()
+	// }()
 
 	response.WriteJSON(fwb)
 	fwb.Flush()
 
-	return fileName, nil
+	return file.Name(), nil
 }

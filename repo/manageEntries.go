@@ -12,6 +12,8 @@ import (
 
 	"flightresourcerestapi/globals"
 	"flightresourcerestapi/models"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 func UpdateFlightEntry(message string, append bool) {
@@ -56,6 +58,36 @@ func UpdateFlightEntry(message string, append bool) {
 	globals.MapMutex.Unlock()
 
 	globals.FlightUpdatedChannel <- models.FlightUpdateChannelMessage{FlightID: flight.GetFlightID(), AirportCode: airportCode}
+
+	// db, err := sql.Open("sqlite3", airportCode+".db")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// defer db.Close()
+
+	// tx, err := db.Begin()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer tx.Rollback() // The rollback will be ignored if the tx has been committed later in the function.
+
+	// stmt, err := tx.Prepare("INSERT INTO flights(flightid, jsonflight) VALUES(  ?, ? )")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer stmt.Close() // Prepared statements take up server resources and should be closed after use.
+
+	// if _, err := stmt.Exec(flight.GetFlightID()); err != nil {
+	// 	log.Fatal(err)
+	// }
+
+	// if err := tx.Commit(); err != nil {
+	// 	log.Fatal(err)
+	// } else {
+	// 	fmt.Println("Wrote Flight to database")
+	// }
+
 }
 func createFlightEntry(message string) {
 
